@@ -608,9 +608,10 @@ const BENEFITS = {
   THC: "$100 hotel credit toward eligible charges · room upgrade (when available). Requires a 2-night minimum stay booked via Amex Travel."
 };
 const AMEX_URL = {
-  FHR: "https://www.americanexpress.com/en-us/travel/discover/fine-hotels-resorts",
-  THC: "https://www.americanexpress.com/en-us/travel/discover/the-hotel-collection"
+  FHR: "https://www.americanexpress.com/en-us/travel/fine-hotels-and-resorts",
+  THC: "https://www.americanexpress.com/en-us/travel/the-hotel-collection/book/"
 };
+const AMEX_OFFERS_URL = "https://www.amextravel.com/featured-hotel-searches";
 const LS_KEY = "stayLedgerData_v1";
 
 /* =========================================================
@@ -1198,9 +1199,11 @@ function hotelPromoSummary(h){
 
 /* ---------- deep links ---------- */
 function googleLink(h){
-  return "https://www.google.com/travel/search?q=" +
-    encodeURIComponent(h.name + " " + h.city) +
-    "&checkin=" + state.ci + "&checkout=" + state.co;
+  // google.com/travel date parameters aren't publicly supported and break on
+  // some devices, so use a plain search — the hotel price panel loads reliably
+  // and you pick the dates there (shown in this popup for reference).
+  return "https://www.google.com/search?q=" +
+    encodeURIComponent(h.name + (h.city ? " " + h.city : "") + " hotel prices");
 }
 function amexLink(h){ return AMEX_URL[h.program] || AMEX_URL.FHR; }
 
@@ -1266,7 +1269,7 @@ function popupHTML(h){
       ).join("");
     } else {
       promoHtml = '<div class="promo off"><div class="pt">No tracked promotions</div>' +
-        '<div class="sub">Check the Amex Travel listing for current offers, then add them in Data.</div></div>';
+        '<div class="sub">Check <a target="_blank" rel="noopener" href="' + AMEX_OFFERS_URL + '">Amex featured hotel offers ↗</a> for current deals, then add them in Data.</div></div>';
     }
     body =
       '<div class="ben"><b>Built-in ' + (h.program === "FHR" ? "FHR" : "Hotel Collection") + ' benefits</b>' + BENEFITS[h.program] + '</div>' +
@@ -1278,7 +1281,7 @@ function popupHTML(h){
     '<button onclick="copyName(\'' + h.id + '\')">Copy name</button>';
   const note = h.program === "STD"
     ? 'Loaded from OpenStreetMap — name and position come from OSM data.'
-    : 'Amex Travel can\u2019t be deep-linked with dates — open it, paste the hotel name, and enter your dates to see the FHR / THC rate.';
+    : 'Amex pages can\u2019t carry your dates in the link — open the program page, then search this hotel (use Copy name) with your dates for the FHR / THC rate. Promos live on the <a target="_blank" rel="noopener" href="' + AMEX_OFFERS_URL + '">featured offers page ↗</a>.';
 
   // recorded real prices for these exact dates — shown first
   const saved = (data.awardLog || {})[awardKey(h.id)];
