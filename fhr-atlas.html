@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Stay Ledger — FHR &amp; Hotel Collection Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css">
+<style>
+:root{
+  --ink:#121C2E;          /* midnight navy */
+  --ink-soft:#2A3A55;
+  --paper:#F2F3F1;        /* porcelain */
+  --card:#FFFFFF;
+  --line:#D8DAD5;
+  --brass:#A8893C;        /* FHR */
+  --brass-deep:#8A6E2B;
+  --slate:#3D5A80;        /* THC */
+  --ok:#1F6E4E;           /* promo qualifies */
+  --ok-bg:#E4F1EA;
+  --near:#A35E1C;         /* near miss */
+  --near-bg:#F7ECDD;
+  --mute:#6B7280;
+  --shadow:0 1px 2px rgba(18,28,46,.08),0 8px 24px rgba(18,28,46,.10);
+  --r:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:'Archivo',system-ui,sans-serif;
+  background:var(--paper);color:var(--ink);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+button{font:inherit;cursor:pointer}
+input,select{font:inherit}
+
+/* ---------- header ---------- */
+header{
+  background:var(--ink);color:#EDEAE2;
+  padding:10px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  border-bottom:3px solid var(--brass);z-index:1100;
+}
+.brand{display:flex;flex-direction:column;line-height:1.1;margin-right:4px}
+.brand h1{font-family:'Marcellus',serif;font-size:1.25rem;font-weight:400;letter-spacing:.04em}
+.brand small{font-family:'IBM Plex Mono',monospace;font-size:.6rem;letter-spacing:.18em;text-transform:uppercase;color:var(--brass);margin-top:2px}
+.hd-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hd-group label{font-family:'IBM Plex Mono',monospace;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:#9AA6BC}
+.hd-group input[type=date]{
+  background:#1C2A44;border:1px solid #34466B;color:#EDEAE2;border-radius:6px;
+  padding:5px 8px;font-family:'IBM Plex Mono',monospace;font-size:.78rem;
+  color-scheme:dark;
+}
+#nights{font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--brass);min-width:64px}
+.hd-search input{
+  background:#1C2A44;border:1px solid #34466B;color:#EDEAE2;border-radius:6px;
+  padding:6px 10px;width:200px;font-size:.85rem;
+}
+.hd-search input::placeholder{color:#7385A4}
+.chip{
+  border:1px solid #34466B;background:transparent;color:#9AA6BC;border-radius:999px;
+  padding:5px 12px;font-family:'IBM Plex Mono',monospace;font-size:.68rem;letter-spacing:.08em;
+  transition:all .15s;
+}
+.chip[aria-pressed=true]{color:#fff;border-color:transparent}
+.chip[data-k=FHR][aria-pressed=true]{background:var(--brass)}
+.chip[data-k=THC][aria-pressed=true]{background:var(--slate)}
+.chip[data-k=promo][aria-pressed=true]{background:var(--ok)}
+.btn-ghost{
+  border:1px solid #34466B;background:transparent;color:#C9CFDA;border-radius:6px;
+  padding:6px 12px;font-size:.78rem;
+}
+.btn-ghost:hover{border-color:var(--brass);color:var(--brass)}
+
+/* ---------- layout ---------- */
+main{flex:1;display:flex;min-height:0}
+aside{
+  width:380px;min-width:300px;background:var(--paper);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;min-height:0;
+}
+.side-head{
+  padding:10px 14px;border-bottom:1px solid var(--line);
+  display:flex;justify-content:space-between;align-items:baseline;
+}
+.side-head h2{font-family:'Marcellus',serif;font-weight:400;font-size:.95rem;letter-spacing:.03em}
+.side-head span{font-family:'IBM Plex Mono',monospace;font-size:.65rem;color:var(--mute)}
+#list{flex:1;overflow-y:auto;padding:10px 12px 24px;display:flex;flex-direction:column;gap:8px}
+#map{flex:1;min-height:0;background:#DCE3E0}
+
+/* ---------- hotel card (the ledger row) ---------- */
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:10px 12px;cursor:pointer;transition:border-color .15s, box-shadow .15s;
+}
+.card:hover,.card:focus-visible{border-color:var(--brass);box-shadow:var(--shadow);outline:none}
+.card .row1{display:flex;align-items:center;gap:9px}
+.seal{
+  width:26px;height:26px;border-radius:50%;flex:none;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Marcellus',serif;font-size:.8rem;color:#fff;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.35);
+}
+.seal.FHR{background:radial-gradient(circle at 30% 30%, #C7A75A, var(--brass-deep))}
+.seal.THC{background:radial-gradient(circle at 30% 30%, #5C7CA6, #2E4767)}
+.card .nm{font-weight:600;font-size:.88rem;line-height:1.2}
+.card .loc{font-size:.72rem;color:var(--mute);margin-top:1px}
+.leader{
+  display:flex;align-items:baseline;gap:6px;margin-top:8px;
+}
+.leader .dots{flex:1;border-bottom:2px dotted var(--line);transform:translateY(-3px)}
+.status{
+  font-family:'IBM Plex Mono',monospace;font-size:.64rem;letter-spacing:.04em;
+  padding:2px 8px;border-radius:4px;white-space:nowrap;
+}
+.status.ok{background:var(--ok-bg);color:var(--ok)}
+.status.near{background:var(--near-bg);color:var(--near)}
+.status.none{background:#EBECEA;color:var(--mute)}
+.empty{
+  text-align:center;color:var(--mute);font-size:.82rem;padding:32px 16px;line-height:1.5;
+}
+
+/* ---------- map markers ---------- */
+.pin{position:relative}
+.pin .p-seal{
+  width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-family:'Marcellus',serif;font-size:.78rem;color:#fff;border:2px solid #fff;
+  box-shadow:0 1px 4px rgba(0,0,0,.35);
+}
+.pin.FHR .p-seal{background:var(--brass)}
+.pin.THC .p-seal{background:var(--slate)}
+.pin .p-dot{
+  position:absolute;top:-3px;right:-3px;width:11px;height:11px;border-radius:50%;
+  border:2px solid #fff;
+}
+.pin .p-dot.ok{background:#2BA06E}
+.pin .p-dot.near{background:#D98E3B}
+.marker-cluster-small,.marker-cluster-medium,.marker-cluster-large{background:rgba(168,137,60,.25)}
+.marker-cluster-small div,.marker-cluster-medium div,.marker-cluster-large div{
+  background:var(--ink);color:#fff;font-family:'IBM Plex Mono',monospace;font-size:.7rem;
+}
+
+/* ---------- popup ---------- */
+.leaflet-popup-content-wrapper{border-radius:12px;box-shadow:var(--shadow)}
+.leaflet-popup-content{margin:14px 16px;width:300px !important;font-family:'Archivo',sans-serif;color:var(--ink)}
+.pp h3{font-family:'Marcellus',serif;font-weight:400;font-size:1.05rem;line-height:1.25;margin-bottom:2px}
+.pp .pl{font-size:.72rem;color:var(--mute);margin-bottom:8px}
+.badge{
+  display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:.6rem;letter-spacing:.1em;
+  padding:2px 7px;border-radius:4px;color:#fff;vertical-align:2px;margin-left:6px;
+}
+.badge.FHR{background:var(--brass)} .badge.THC{background:var(--slate)}
+.pp .ben{
+  font-size:.72rem;color:var(--ink-soft);background:var(--paper);
+  border:1px solid var(--line);border-radius:8px;padding:7px 9px;margin-bottom:8px;line-height:1.45;
+}
+.pp .ben b{font-family:'IBM Plex Mono',monospace;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);display:block;margin-bottom:2px;font-weight:600}
+.promo{
+  border-radius:8px;padding:7px 9px;margin-bottom:6px;font-size:.74rem;line-height:1.45;
+  border:1px solid transparent;
+}
+.promo.ok{background:var(--ok-bg);border-color:#BFDCCB;color:#15523A}
+.promo.near{background:var(--near-bg);border-color:#E8CFA8;color:#7A4612}
+.promo.off{background:#EFF0EE;border-color:var(--line);color:var(--mute)}
+.promo .pt{font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.promo .tag{
+  font-family:'IBM Plex Mono',monospace;font-size:.56rem;letter-spacing:.1em;
+  padding:1px 5px;border-radius:3px;background:rgba(0,0,0,.08);
+}
+.promo .sub{margin-top:2px}
+.pp .links{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.pp .links a,.pp .links button{
+  flex:1;min-width:86px;text-align:center;text-decoration:none;border-radius:6px;
+  padding:7px 8px;font-size:.72rem;font-weight:600;border:1px solid var(--line);
+  background:#fff;color:var(--ink);transition:all .15s;
+}
+.pp .links a.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.pp .links a:hover,.pp .links button:hover{border-color:var(--brass);color:var(--brass-deep)}
+.pp .links a.primary:hover{background:var(--ink-soft);color:#fff}
+.pp .note{font-size:.64rem;color:var(--mute);margin-top:8px;line-height:1.4}
+
+/* ---------- standard hotels & brands ---------- */
+.seal.STD{background:radial-gradient(circle at 30% 30%, #98A0AB, #5A616C);font-size:.95rem}
+.pin.STD .p-seal{background:#6B7280;width:16px;height:16px;font-size:.6rem;border-width:2px}
+.badge.STD{background:#6B7280}
+.brand-line{font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:#8A8F98;margin-top:2px;letter-spacing:.02em}
+.status.brand{background:#EBEEF4;color:#46506B}
+#brandSel{
+  background:#1C2A44;border:1px solid #34466B;color:#EDEAE2;border-radius:6px;
+  padding:5px 8px;font-size:.75rem;max-width:180px;
+}
+.osm-ctl{
+  background:var(--ink);color:#fff;border:none;border-radius:8px;padding:8px 12px;
+  font:600 .74rem 'Archivo',sans-serif;box-shadow:var(--shadow);cursor:pointer;
+}
+.osm-ctl:hover:not([disabled]){background:var(--ink-soft)}
+.osm-ctl[disabled]{opacity:.65;cursor:wait}
+
+/* ---------- points vs cash calculator ---------- */
+.pc-row{display:flex;gap:6px;margin:6px 0 5px}
+.pc-row input{
+  flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;
+  padding:5px 7px;font-size:.72rem;background:#fff;color:var(--ink);
+  font-family:'IBM Plex Mono',monospace;
+}
+.pc-row input:focus{border-color:var(--brass);outline:none}
+.pc-out{font-size:.7rem;line-height:1.5;color:var(--ink-soft)}
+.pc-out .v-ok{color:var(--ok);font-weight:700;letter-spacing:.04em}
+.pc-out .v-bad{color:#A33B2E;font-weight:700;letter-spacing:.04em}
+.pc-link{
+  display:inline-block;margin:3px 0 2px;font-size:.7rem;font-weight:700;
+  color:var(--slate);text-decoration:none;border-bottom:1px dotted var(--slate);
+}
+.pc-link:hover{color:var(--brass-deep);border-color:var(--brass-deep)}
+.pc-saved{color:var(--mute);font-size:.62rem;font-family:'IBM Plex Mono',monospace}
+
+/* ---------- banner / modal / toast ---------- */
+#banner{
+  background:#FBF6E9;border-bottom:1px solid #E7DBB8;color:#6E5A1F;
+  font-size:.74rem;padding:7px 16px;display:flex;gap:10px;align-items:center;z-index:1099;
+}
+#banner button{margin-left:auto;border:none;background:none;color:#6E5A1F;font-size:1rem;line-height:1}
+dialog{
+  border:none;border-radius:14px;box-shadow:var(--shadow);width:min(720px,92vw);
+  padding:0;background:var(--card);color:var(--ink);
+}
+dialog::backdrop{background:rgba(18,28,46,.55)}
+.dlg-head{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center}
+.dlg-head h2{font-family:'Marcellus',serif;font-weight:400;font-size:1.1rem}
+.dlg-head button{margin-left:auto;border:none;background:none;font-size:1.2rem;color:var(--mute)}
+.dlg-body{padding:14px 18px;font-size:.82rem;line-height:1.5}
+.dlg-body textarea{
+  width:100%;height:300px;font-family:'IBM Plex Mono',monospace;font-size:.72rem;
+  border:1px solid var(--line);border-radius:8px;padding:10px;resize:vertical;
+  background:var(--paper);color:var(--ink);
+}
+.dlg-foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap}
+.btn{
+  border-radius:7px;padding:8px 14px;font-size:.8rem;font-weight:600;border:1px solid var(--line);background:#fff;color:var(--ink);
+}
+.btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.primary:hover{background:var(--ink-soft)}
+.btn:hover{border-color:var(--brass)}
+#toast{
+  position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(10px);
+  background:var(--ink);color:#fff;padding:9px 16px;border-radius:8px;font-size:.78rem;
+  opacity:0;pointer-events:none;transition:all .25s;z-index:3000;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+
+/* ---------- mobile ---------- */
+@media (max-width:820px){
+  body{overflow:auto}
+  header{gap:10px}
+  .hd-search input{width:140px}
+  main{flex-direction:column}
+  #map{height:46vh;flex:none}
+  aside{width:100%;min-width:0;border-right:none;border-top:1px solid var(--line);max-height:none}
+  #list{max-height:none}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>The Stay Ledger</h1>
+    <small>Amex FHR · Hotel Collection Atlas</small>
+  </div>
+  <div class="hd-group">
+    <label for="ci">Check-in</label>
+    <input type="date" id="ci">
+    <label for="co">Check-out</label>
+    <input type="date" id="co">
+    <span id="nights"></span>
+  </div>
+  <div class="hd-group hd-search">
+    <input type="search" id="q" placeholder="Search hotel, city, country…" aria-label="Search hotels">
+  </div>
+  <div class="hd-group">
+    <button class="chip" data-k="FHR" aria-pressed="true">FHR</button>
+    <button class="chip" data-k="THC" aria-pressed="true">Hotel Collection</button>
+    <button class="chip" data-k="STD" aria-pressed="true">Other hotels</button>
+    <button class="chip" data-k="promo" aria-pressed="false">Promos only</button>
+  </div>
+  <div class="hd-group">
+    <select id="brandSel" aria-label="Filter by hotel brand group">
+      <option value="">All brands</option>
+    </select>
+  </div>
+  <div class="hd-group" style="margin-left:auto">
+    <button class="btn-ghost" id="dataBtn">Data</button>
+  </div>
+</header>
+
+<div id="banner">
+  <span><strong>Seed data is illustrative.</strong> Hotel list, coordinates, and program membership are approximate, and promotions are samples — verify current offers on Amex Travel, then keep this list current via the Data editor.</span>
+  <button id="bannerX" aria-label="Dismiss notice">×</button>
+</div>
+
+<main>
+  <aside>
+    <div class="side-head">
+      <h2>Ledger</h2>
+      <span id="count"></span>
+    </div>
+    <div id="list" role="list"></div>
+  </aside>
+  <div id="map"></div>
+</main>
+
+<dialog id="dataDlg">
+  <div class="dlg-head"><h2>Hotel &amp; promotion data</h2><button data-close aria-label="Close">×</button></div>
+  <div class="dlg-body">
+    <p style="margin-bottom:8px;color:var(--mute)">
+      Edit the JSON below and save. <code>hotels</code>: id, name, city, country, lat, lng, program ("FHR" or "THC").
+      <code>promos</code>: hotelId, type ("nth_night_free" | "pct_off" | "credit"), n / pct / amount,
+      stayStart, stayEnd, bookBy (optional), minNights (optional), sample (optional flag).
+      <code>pointValues</code>: per-program baseline ¢/pt (cpp), Amex MR transfer ratio (mr), and your mrBaseline — tune these to your own valuations.
+      Saved to this browser; use Export for a backup file.
+    </p>
+    <textarea id="dataTa" spellcheck="false"></textarea>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)">
+      <b style="font-size:.8rem">Quick add Amex hotels</b>
+      <p style="font-size:.72rem;color:var(--mute);margin:4px 0 6px">
+        Copy hotel names straight off the Amex Travel FHR / Hotel Collection pages — one per line,
+        ideally as “Name, City”. Each is located via OpenStreetMap Nominatim (about 1 per second) and added to the map.
+        Lines that can't be located stay in the box so you can fix and retry.
+      </p>
+      <textarea id="qaNames" style="height:90px" spellcheck="false" placeholder="The Ritz-Carlton Half Moon Bay, California&#10;Hotel Esencia, Tulum"></textarea>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
+        <select id="qaProg" style="border:1px solid var(--line);border-radius:6px;padding:6px;background:#fff">
+          <option value="FHR">FHR</option>
+          <option value="THC">Hotel Collection</option>
+        </select>
+        <button class="btn" id="qaGo">Locate &amp; add</button>
+        <span id="qaOut" style="font-size:.72rem;color:var(--mute)"></span>
+      </div>
+    </div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn primary" id="saveData">Save</button>
+    <button class="btn" id="exportData">Export JSON</button>
+    <button class="btn" id="resetData">Reset to seed</button>
+    <span id="dataMsg" style="align-self:center;font-size:.74rem;color:var(--mute)"></span>
+  </div>
+</dialog>
+
+<div id="toast" role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script>
+/* =========================================================
+   Seed data — illustrative starting set. Maintain via Data.
+   ========================================================= */
+const SEED = {
+  hotels: [
+    // — US West —
+    {id:"bevhills", name:"The Beverly Hills Hotel", city:"Los Angeles", country:"USA", lat:34.0817, lng:-118.4138, program:"FHR"},
+    {id:"belair", name:"Hotel Bel-Air", city:"Los Angeles", country:"USA", lat:34.0866, lng:-118.4467, program:"FHR"},
+    {id:"penbh", name:"The Peninsula Beverly Hills", city:"Beverly Hills", country:"USA", lat:34.0673, lng:-118.4068, program:"FHR"},
+    {id:"wabh", name:"Waldorf Astoria Beverly Hills", city:"Beverly Hills", country:"USA", lat:34.0697, lng:-118.3996, program:"FHR"},
+    {id:"pendrywh", name:"Pendry West Hollywood", city:"West Hollywood", country:"USA", lat:34.0950, lng:-118.3850, program:"THC"},
+    {id:"montagelb", name:"Montage Laguna Beach", city:"Laguna Beach", country:"USA", lat:33.5128, lng:-117.7613, program:"FHR"},
+    {id:"wamb", name:"Waldorf Astoria Monarch Beach", city:"Dana Point", country:"USA", lat:33.4760, lng:-117.7140, program:"FHR"},
+    {id:"granddelmar", name:"Fairmont Grand Del Mar", city:"San Diego", country:"USA", lat:32.9392, lng:-117.1903, program:"FHR"},
+    {id:"pendrysd", name:"Pendry San Diego", city:"San Diego", country:"USA", lat:32.7107, lng:-117.1598, program:"THC"},
+    {id:"stregsf", name:"The St. Regis San Francisco", city:"San Francisco", country:"USA", lat:37.7858, lng:-122.4008, program:"FHR"},
+    {id:"fairmontsf", name:"Fairmont San Francisco", city:"San Francisco", country:"USA", lat:37.7923, lng:-122.4102, program:"THC"},
+    {id:"wynn", name:"Wynn Las Vegas", city:"Las Vegas", country:"USA", lat:36.1265, lng:-115.1659, program:"FHR"},
+    {id:"bellagio", name:"Bellagio", city:"Las Vegas", country:"USA", lat:36.1126, lng:-115.1767, program:"FHR"},
+    {id:"phoenician", name:"The Phoenician", city:"Scottsdale", country:"USA", lat:33.5018, lng:-111.9437, program:"FHR"},
+    {id:"amangiri", name:"Amangiri", city:"Canyon Point, UT", country:"USA", lat:37.0080, lng:-111.4500, program:"FHR"},
+    {id:"littlenell", name:"The Little Nell", city:"Aspen", country:"USA", lat:39.1863, lng:-106.8172, program:"FHR"},
+    {id:"montagedv", name:"Montage Deer Valley", city:"Park City", country:"USA", lat:40.6390, lng:-111.4780, program:"FHR"},
+    {id:"halekulani", name:"Halekulani", city:"Honolulu", country:"USA", lat:21.2767, lng:-157.8308, program:"FHR"},
+    {id:"fskoolina", name:"Four Seasons Resort Oahu at Ko Olina", city:"Kapolei", country:"USA", lat:21.3387, lng:-158.1256, program:"FHR"},
+    {id:"grandwailea", name:"Grand Wailea", city:"Maui", country:"USA", lat:20.6840, lng:-156.4420, program:"FHR"},
+    // — US Central / East —
+    {id:"phchicago", name:"Park Hyatt Chicago", city:"Chicago", country:"USA", lat:41.8973, lng:-87.6256, program:"FHR"},
+    {id:"langhamchi", name:"The Langham, Chicago", city:"Chicago", country:"USA", lat:41.8889, lng:-87.6359, program:"FHR"},
+    {id:"crescent", name:"Hotel Crescent Court", city:"Dallas", country:"USA", lat:32.7937, lng:-96.8030, program:"THC"},
+    {id:"hayadams", name:"The Hay-Adams", city:"Washington, DC", country:"USA", lat:38.9007, lng:-77.0365, program:"FHR"},
+    {id:"fsdc", name:"Four Seasons Hotel Washington, DC", city:"Washington, DC", country:"USA", lat:38.9043, lng:-77.0563, program:"FHR"},
+    {id:"fsboston", name:"Four Seasons Hotel Boston", city:"Boston", country:"USA", lat:42.3503, lng:-71.0697, program:"FHR"},
+    {id:"xvbeacon", name:"XV Beacon", city:"Boston", country:"USA", lat:42.3578, lng:-71.0617, program:"THC"},
+    {id:"stregny", name:"The St. Regis New York", city:"New York", country:"USA", lat:40.7614, lng:-73.9746, program:"FHR"},
+    {id:"plaza", name:"The Plaza", city:"New York", country:"USA", lat:40.7644, lng:-73.9745, program:"FHR"},
+    {id:"baccarat", name:"Baccarat Hotel New York", city:"New York", country:"USA", lat:40.7605, lng:-73.9788, program:"FHR"},
+    {id:"phny", name:"Park Hyatt New York", city:"New York", country:"USA", lat:40.7654, lng:-73.9797, program:"FHR"},
+    {id:"mony", name:"Mandarin Oriental, New York", city:"New York", country:"USA", lat:40.7690, lng:-73.9826, program:"FHR"},
+    {id:"conradny", name:"Conrad New York Downtown", city:"New York", country:"USA", lat:40.7152, lng:-74.0156, program:"THC"},
+    {id:"thompsoncp", name:"Thompson Central Park New York", city:"New York", country:"USA", lat:40.7637, lng:-73.9790, program:"THC"},
+    {id:"faena", name:"Faena Hotel Miami Beach", city:"Miami Beach", country:"USA", lat:25.8030, lng:-80.1226, program:"FHR"},
+    {id:"setai", name:"The Setai, Miami Beach", city:"Miami Beach", country:"USA", lat:25.7959, lng:-80.1280, program:"FHR"},
+    {id:"surfclub", name:"Four Seasons at The Surf Club", city:"Surfside", country:"USA", lat:25.8784, lng:-80.1207, program:"FHR"},
+    // — Canada / Mexico —
+    {id:"banff", name:"Fairmont Banff Springs", city:"Banff", country:"Canada", lat:51.1644, lng:-115.5614, program:"THC"},
+    {id:"fsmx", name:"Four Seasons Hotel Mexico City", city:"Mexico City", country:"Mexico", lat:19.4255, lng:-99.1752, program:"FHR"},
+    {id:"mayakoba", name:"Rosewood Mayakoba", city:"Playa del Carmen", country:"Mexico", lat:20.6700, lng:-86.9620, program:"FHR"},
+    {id:"palmilla", name:"One&Only Palmilla", city:"Los Cabos", country:"Mexico", lat:23.0079, lng:-109.7107, program:"FHR"},
+    {id:"pedregal", name:"Waldorf Astoria Los Cabos Pedregal", city:"Cabo San Lucas", country:"Mexico", lat:22.8773, lng:-109.9128, program:"FHR"},
+    // — Europe —
+    {id:"claridges", name:"Claridge's", city:"London", country:"UK", lat:51.5126, lng:-0.1478, program:"FHR"},
+    {id:"savoy", name:"The Savoy", city:"London", country:"UK", lat:51.5101, lng:-0.1206, program:"FHR"},
+    {id:"connaught", name:"The Connaught", city:"London", country:"UK", lat:51.5099, lng:-0.1494, program:"FHR"},
+    {id:"georgev", name:"Four Seasons Hotel George V", city:"Paris", country:"France", lat:48.8689, lng:2.3008, program:"FHR"},
+    {id:"bristol", name:"Le Bristol Paris", city:"Paris", country:"France", lat:48.8718, lng:2.3147, program:"FHR"},
+    {id:"athenee", name:"Hôtel Plaza Athénée", city:"Paris", country:"France", lat:48.8662, lng:2.3036, program:"FHR"},
+    {id:"icparis", name:"InterContinental Paris Le Grand", city:"Paris", country:"France", lat:48.8711, lng:2.3308, program:"THC"},
+    {id:"artsbcn", name:"Hotel Arts Barcelona", city:"Barcelona", country:"Spain", lat:41.3870, lng:2.1968, program:"FHR"},
+    {id:"wbcn", name:"W Barcelona", city:"Barcelona", country:"Spain", lat:41.3680, lng:2.1900, program:"THC"},
+    {id:"derussie", name:"Hotel de Russie", city:"Rome", country:"Italy", lat:41.9097, lng:12.4769, program:"FHR"},
+    {id:"hassler", name:"Hassler Roma", city:"Rome", country:"Italy", lat:41.9059, lng:12.4833, program:"FHR"},
+    {id:"stregrome", name:"The St. Regis Rome", city:"Rome", country:"Italy", lat:41.9046, lng:12.4940, program:"FHR"},
+    // — Middle East / Asia / Pacific —
+    {id:"burj", name:"Burj Al Arab Jumeirah", city:"Dubai", country:"UAE", lat:25.1412, lng:55.1853, program:"FHR"},
+    {id:"atlantisroyal", name:"Atlantis The Royal", city:"Dubai", country:"UAE", lat:25.1370, lng:55.1170, program:"FHR"},
+    {id:"amantokyo", name:"Aman Tokyo", city:"Tokyo", country:"Japan", lat:35.6850, lng:139.7637, program:"FHR"},
+    {id:"phtokyo", name:"Park Hyatt Tokyo", city:"Tokyo", country:"Japan", lat:35.6855, lng:139.6903, program:"FHR"},
+    {id:"pentokyo", name:"The Peninsula Tokyo", city:"Tokyo", country:"Japan", lat:35.6743, lng:139.7607, program:"FHR"},
+    {id:"phkyoto", name:"Park Hyatt Kyoto", city:"Kyoto", country:"Japan", lat:34.9966, lng:135.7800, program:"FHR"},
+    {id:"mitsui", name:"HOTEL THE MITSUI KYOTO", city:"Kyoto", country:"Japan", lat:35.0124, lng:135.7510, program:"FHR"},
+    {id:"fsseoul", name:"Four Seasons Hotel Seoul", city:"Seoul", country:"South Korea", lat:37.5703, lng:126.9758, program:"FHR"},
+    {id:"shilla", name:"The Shilla Seoul", city:"Seoul", country:"South Korea", lat:37.5556, lng:127.0054, program:"FHR"},
+    {id:"signiel", name:"Signiel Seoul", city:"Seoul", country:"South Korea", lat:37.5125, lng:127.1025, program:"FHR"},
+    {id:"penhk", name:"The Peninsula Hong Kong", city:"Hong Kong", country:"Hong Kong", lat:22.2950, lng:114.1722, program:"FHR"},
+    {id:"mohk", name:"Mandarin Oriental, Hong Kong", city:"Hong Kong", country:"Hong Kong", lat:22.2818, lng:114.1595, program:"FHR"},
+    {id:"raffles", name:"Raffles Singapore", city:"Singapore", country:"Singapore", lat:1.2949, lng:103.8540, program:"FHR"},
+    {id:"capella", name:"Capella Singapore", city:"Sentosa", country:"Singapore", lat:1.2495, lng:103.8238, program:"FHR"},
+    {id:"mobkk", name:"Mandarin Oriental, Bangkok", city:"Bangkok", country:"Thailand", lat:13.7244, lng:100.5140, program:"FHR"},
+    {id:"phsydney", name:"Park Hyatt Sydney", city:"Sydney", country:"Australia", lat:-33.8555, lng:151.2100, program:"FHR"},
+    {id:"fsbali", name:"Four Seasons Resort Bali at Sayan", city:"Ubud, Bali", country:"Indonesia", lat:-8.4880, lng:115.2540, program:"FHR"},
+    {id:"reethirah", name:"One&Only Reethi Rah", city:"North Malé Atoll", country:"Maldives", lat:4.5167, lng:73.3795, program:"FHR"},
+    {id:"fsbora", name:"Four Seasons Resort Bora Bora", city:"Bora Bora", country:"French Polynesia", lat:-16.4634, lng:-151.7150, program:"FHR"},
+    // — expanded seed: US West —
+    {id:"fblv", name:"Fontainebleau Las Vegas", city:"Las Vegas", country:"USA", lat:36.1370, lng:-115.1585, program:"FHR"},
+    {id:"venetian", name:"The Venetian Resort Las Vegas", city:"Las Vegas", country:"USA", lat:36.1212, lng:-115.1697, program:"FHR"},
+    {id:"crockfords", name:"Crockfords Las Vegas", city:"Las Vegas", country:"USA", lat:36.1340, lng:-115.1630, program:"FHR"},
+    {id:"conradlv", name:"Conrad Las Vegas at Resorts World", city:"Las Vegas", country:"USA", lat:36.1335, lng:-115.1636, program:"THC"},
+    {id:"walv", name:"Waldorf Astoria Las Vegas", city:"Las Vegas", country:"USA", lat:36.1075, lng:-115.1760, program:"FHR"},
+    {id:"fslv", name:"Four Seasons Hotel Las Vegas", city:"Las Vegas", country:"USA", lat:36.0930, lng:-115.1760, program:"FHR"},
+    {id:"rcln", name:"The Ritz-Carlton, Laguna Niguel", city:"Dana Point", country:"USA", lat:33.4790, lng:-117.7180, program:"FHR"},
+    {id:"pelicanhill", name:"The Resort at Pelican Hill", city:"Newport Coast", country:"USA", lat:33.5880, lng:-117.8430, program:"FHR"},
+    {id:"fairmontcp", name:"Fairmont Century Plaza", city:"Los Angeles", country:"USA", lat:34.0590, lng:-118.4170, program:"FHR"},
+    {id:"conradla", name:"Conrad Los Angeles", city:"Los Angeles", country:"USA", lat:34.0560, lng:-118.2500, program:"THC"},
+    {id:"maybourne", name:"The Maybourne Beverly Hills", city:"Beverly Hills", country:"USA", lat:34.0660, lng:-118.3990, program:"FHR"},
+    {id:"shutters", name:"Shutters on the Beach", city:"Santa Monica", country:"USA", lat:34.0080, lng:-118.4910, program:"FHR"},
+    {id:"casadelmar", name:"Hotel Casa del Mar", city:"Santa Monica", country:"USA", lat:34.0090, lng:-118.4900, program:"FHR"},
+    {id:"terranea", name:"Terranea Resort", city:"Rancho Palos Verdes", country:"USA", lat:33.7390, lng:-118.3950, program:"THC"},
+    {id:"rcsf", name:"The Ritz-Carlton, San Francisco", city:"San Francisco", country:"USA", lat:37.7920, lng:-122.4060, program:"FHR"},
+    {id:"fssf", name:"Four Seasons Hotel San Francisco", city:"San Francisco", country:"USA", lat:37.7860, lng:-122.4040, program:"FHR"},
+    {id:"1hotelsf", name:"1 Hotel San Francisco", city:"San Francisco", country:"USA", lat:37.7930, lng:-122.3920, program:"THC"},
+    {id:"pebble", name:"The Lodge at Pebble Beach", city:"Pebble Beach", country:"USA", lat:36.5680, lng:-121.9500, program:"FHR"},
+    {id:"ventana", name:"Ventana Big Sur", city:"Big Sur", country:"USA", lat:36.2290, lng:-121.7660, program:"FHR"},
+    {id:"sanysidro", name:"San Ysidro Ranch", city:"Montecito", country:"USA", lat:34.4500, lng:-119.6280, program:"FHR"},
+    {id:"miramar", name:"Rosewood Miramar Beach", city:"Montecito", country:"USA", lat:34.4210, lng:-119.6440, program:"FHR"},
+    {id:"ojai", name:"Ojai Valley Inn", city:"Ojai", country:"USA", lat:34.4440, lng:-119.2580, program:"FHR"},
+    {id:"aviara", name:"Park Hyatt Aviara", city:"Carlsbad", country:"USA", lat:33.1010, lng:-117.2870, program:"FHR"},
+    {id:"ranchoval", name:"Rancho Valencia Resort & Spa", city:"Rancho Santa Fe", country:"USA", lat:33.0190, lng:-117.1910, program:"FHR"},
+    {id:"estancia", name:"Estancia La Jolla", city:"La Jolla", country:"USA", lat:32.8930, lng:-117.2360, program:"THC"},
+    {id:"delcoronado", name:"Hotel del Coronado", city:"Coronado", country:"USA", lat:32.6810, lng:-117.1780, program:"THC"},
+    {id:"stregdv", name:"The St. Regis Deer Valley", city:"Park City", country:"USA", lat:40.6230, lng:-111.4860, program:"FHR"},
+    {id:"pendrypc", name:"Pendry Park City", city:"Park City", country:"USA", lat:40.6850, lng:-111.5560, program:"THC"},
+    {id:"broadmoor", name:"The Broadmoor", city:"Colorado Springs", country:"USA", lat:38.7910, lng:-104.8520, program:"FHR"},
+    // — expanded seed: Hawaii —
+    {id:"rckapalua", name:"The Ritz-Carlton Maui, Kapalua", city:"Maui", country:"USA", lat:21.0030, lng:-156.6520, program:"FHR"},
+    {id:"fswailea", name:"Four Seasons Resort Maui at Wailea", city:"Maui", country:"USA", lat:20.6800, lng:-156.4430, program:"FHR"},
+    {id:"montagekb", name:"Montage Kapalua Bay", city:"Maui", country:"USA", lat:20.9990, lng:-156.6660, program:"FHR"},
+    {id:"maunalani", name:"Mauna Lani, Auberge Resorts", city:"Big Island", country:"USA", lat:19.9410, lng:-155.8650, program:"FHR"},
+    {id:"hualalai", name:"Four Seasons Resort Hualalai", city:"Big Island", country:"USA", lat:19.8270, lng:-155.9880, program:"FHR"},
+    {id:"1hanalei", name:"1 Hotel Hanalei Bay", city:"Kauai", country:"USA", lat:22.2160, lng:-159.4940, program:"FHR"},
+    {id:"princewk", name:"Prince Waikiki", city:"Honolulu", country:"USA", lat:21.2840, lng:-157.8390, program:"THC"},
+    // — expanded seed: US East / Central —
+    {id:"amanny", name:"Aman New York", city:"New York", country:"USA", lat:40.7560, lng:-73.9790, program:"FHR"},
+    {id:"carlyle", name:"The Carlyle, A Rosewood Hotel", city:"New York", country:"USA", lat:40.7740, lng:-73.9630, program:"FHR"},
+    {id:"lowell", name:"The Lowell", city:"New York", country:"USA", lat:40.7660, lng:-73.9680, program:"FHR"},
+    {id:"cipriani", name:"Casa Cipriani New York", city:"New York", country:"USA", lat:40.7010, lng:-74.0120, program:"FHR"},
+    {id:"pendrymw", name:"Pendry Manhattan West", city:"New York", country:"USA", lat:40.7530, lng:-73.9990, program:"THC"},
+    {id:"langhamny", name:"The Langham, New York, Fifth Avenue", city:"New York", country:"USA", lat:40.7480, lng:-73.9850, program:"FHR"},
+    {id:"lottepalace", name:"Lotte New York Palace", city:"New York", country:"USA", lat:40.7580, lng:-73.9750, program:"THC"},
+    {id:"conraddc", name:"Conrad Washington DC", city:"Washington, DC", country:"USA", lat:38.9010, lng:-77.0260, program:"THC"},
+    {id:"salamander", name:"Salamander Washington DC", city:"Washington, DC", country:"USA", lat:38.8790, lng:-77.0170, program:"FHR"},
+    {id:"newbury", name:"The Newbury Boston", city:"Boston", country:"USA", lat:42.3520, lng:-71.0710, program:"FHR"},
+    {id:"onedalton", name:"Four Seasons Hotel One Dalton Street", city:"Boston", country:"USA", lat:42.3450, lng:-71.0830, program:"FHR"},
+    {id:"breakers", name:"The Breakers Palm Beach", city:"Palm Beach", country:"USA", lat:26.7150, lng:-80.0340, program:"FHR"},
+    {id:"fspb", name:"Four Seasons Resort Palm Beach", city:"Palm Beach", country:"USA", lat:26.6610, lng:-80.0370, program:"FHR"},
+    {id:"acqualina", name:"Acqualina Resort & Residences", city:"Sunny Isles Beach", country:"USA", lat:25.9420, lng:-80.1210, program:"FHR"},
+    {id:"stregbal", name:"The St. Regis Bal Harbour", city:"Bal Harbour", country:"USA", lat:25.8890, lng:-80.1230, program:"FHR"},
+    {id:"rckb", name:"The Ritz-Carlton Key Biscayne", city:"Key Biscayne", country:"USA", lat:25.6850, lng:-80.1560, program:"FHR"},
+    {id:"loewsmb", name:"Loews Miami Beach", city:"Miami Beach", country:"USA", lat:25.7940, lng:-80.1290, program:"THC"},
+    {id:"waorlando", name:"Waldorf Astoria Orlando", city:"Orlando", country:"USA", lat:28.3590, lng:-81.5430, program:"FHR"},
+    {id:"fsorlando", name:"Four Seasons Resort Orlando", city:"Orlando", country:"USA", lat:28.3850, lng:-81.5440, program:"FHR"},
+    {id:"conradorl", name:"Conrad Orlando", city:"Orlando", country:"USA", lat:28.3640, lng:-81.5740, program:"THC"},
+    {id:"rcgl", name:"The Ritz-Carlton Orlando, Grande Lakes", city:"Orlando", country:"USA", lat:28.4010, lng:-81.4280, program:"FHR"},
+    {id:"seaisland", name:"The Cloister at Sea Island", city:"Sea Island", country:"USA", lat:31.2030, lng:-81.3450, program:"FHR"},
+    {id:"palmetto", name:"Montage Palmetto Bluff", city:"Bluffton", country:"USA", lat:32.2180, lng:-80.8870, program:"FHR"},
+    {id:"hermitage", name:"The Hermitage Hotel", city:"Nashville", country:"USA", lat:36.1660, lng:-86.7820, program:"THC"},
+    {id:"thompsonnash", name:"Thompson Nashville", city:"Nashville", country:"USA", lat:36.1520, lng:-86.7830, program:"THC"},
+    {id:"penchicago", name:"The Peninsula Chicago", city:"Chicago", country:"USA", lat:41.8950, lng:-87.6250, program:"FHR"},
+    {id:"wachicago", name:"Waldorf Astoria Chicago", city:"Chicago", country:"USA", lat:41.9010, lng:-87.6280, program:"FHR"},
+    {id:"fschicago", name:"Four Seasons Hotel Chicago", city:"Chicago", country:"USA", lat:41.8990, lng:-87.6230, program:"FHR"},
+    {id:"rcdallas", name:"The Ritz-Carlton, Dallas", city:"Dallas", country:"USA", lat:32.7930, lng:-96.8040, program:"FHR"},
+    {id:"mansiontc", name:"Rosewood Mansion on Turtle Creek", city:"Dallas", country:"USA", lat:32.8030, lng:-96.8090, program:"FHR"},
+    {id:"postoak", name:"The Post Oak Hotel", city:"Houston", country:"USA", lat:29.7430, lng:-95.4610, program:"FHR"},
+    {id:"commodore", name:"Commodore Perry Estate, Auberge", city:"Austin", country:"USA", lat:30.3010, lng:-97.7260, program:"FHR"},
+    {id:"fsaustin", name:"Four Seasons Hotel Austin", city:"Austin", country:"USA", lat:30.2620, lng:-97.7430, program:"FHR"},
+    {id:"hotelemma", name:"Hotel Emma", city:"San Antonio", country:"USA", lat:29.4440, lng:-98.4800, program:"THC"},
+    // — expanded seed: Caribbean —
+    {id:"amanyara", name:"Amanyara", city:"Providenciales", country:"Turks & Caicos", lat:21.8120, lng:-72.3370, program:"FHR"},
+    {id:"gracebay", name:"Grace Bay Club", city:"Providenciales", country:"Turks & Caicos", lat:21.7920, lng:-72.1850, program:"FHR"},
+    // — expanded seed: Europe —
+    {id:"dorchester", name:"The Dorchester", city:"London", country:"UK", lat:51.5070, lng:-0.1525, program:"FHR"},
+    {id:"fslondon", name:"Four Seasons Hotel London at Park Lane", city:"London", country:"UK", lat:51.5050, lng:-0.1500, program:"FHR"},
+    {id:"langhamldn", name:"The Langham, London", city:"London", country:"UK", lat:51.5180, lng:-0.1440, program:"FHR"},
+    {id:"corinthia", name:"Corinthia London", city:"London", country:"UK", lat:51.5060, lng:-0.1240, program:"FHR"},
+    {id:"owo", name:"Raffles London at The OWO", city:"London", country:"UK", lat:51.5060, lng:-0.1260, program:"FHR"},
+    {id:"conradstj", name:"Conrad London St. James", city:"London", country:"UK", lat:51.4990, lng:-0.1340, program:"THC"},
+    {id:"mohp", name:"Mandarin Oriental Hyde Park", city:"London", country:"UK", lat:51.5020, lng:-0.1600, program:"FHR"},
+    {id:"chevalblanc", name:"Cheval Blanc Paris", city:"Paris", country:"France", lat:48.8590, lng:2.3420, program:"FHR"},
+    {id:"ritzparis", name:"Ritz Paris", city:"Paris", country:"France", lat:48.8680, lng:2.3280, program:"FHR"},
+    {id:"meurice", name:"Le Meurice", city:"Paris", country:"France", lat:48.8650, lng:2.3280, program:"FHR"},
+    {id:"moparis", name:"Mandarin Oriental, Paris", city:"Paris", country:"France", lat:48.8670, lng:2.3290, program:"FHR"},
+    {id:"phparis", name:"Park Hyatt Paris-Vendôme", city:"Paris", country:"France", lat:48.8690, lng:2.3300, program:"FHR"},
+    {id:"sofitelfb", name:"Sofitel Paris Le Faubourg", city:"Paris", country:"France", lat:48.8670, lng:2.3220, program:"THC"},
+    {id:"bulgariroma", name:"Bulgari Hotel Roma", city:"Rome", country:"Italy", lat:41.9080, lng:12.4760, program:"FHR"},
+    {id:"bulgarimi", name:"Bulgari Hotel Milano", city:"Milan", country:"Italy", lat:45.4700, lng:9.1900, program:"FHR"},
+    {id:"fsmilano", name:"Four Seasons Hotel Milano", city:"Milan", country:"Italy", lat:45.4690, lng:9.1960, program:"FHR"},
+    {id:"momilan", name:"Mandarin Oriental, Milan", city:"Milan", country:"Italy", lat:45.4690, lng:9.1920, program:"FHR"},
+    {id:"amanvenice", name:"Aman Venice", city:"Venice", country:"Italy", lat:45.4350, lng:12.3330, program:"FHR"},
+    {id:"gritti", name:"The Gritti Palace", city:"Venice", country:"Italy", lat:45.4310, lng:12.3330, program:"FHR"},
+    {id:"cipnvenice", name:"Belmond Hotel Cipriani", city:"Venice", country:"Italy", lat:45.4260, lng:12.3460, program:"FHR"},
+    {id:"fsfirenze", name:"Four Seasons Hotel Firenze", city:"Florence", country:"Italy", lat:43.7790, lng:11.2630, program:"FHR"},
+    {id:"moritz", name:"Mandarin Oriental Ritz, Madrid", city:"Madrid", country:"Spain", lat:40.4150, lng:-3.6920, program:"FHR"},
+    {id:"fsmadrid", name:"Four Seasons Hotel Madrid", city:"Madrid", country:"Spain", lat:40.4180, lng:-3.6990, program:"FHR"},
+    {id:"alfonso", name:"Hotel Alfonso XIII", city:"Seville", country:"Spain", lat:37.3840, lng:-5.9930, program:"THC"},
+    {id:"ssdouro", name:"Six Senses Douro Valley", city:"Lamego", country:"Portugal", lat:41.1530, lng:-7.7890, program:"FHR"},
+    {id:"ritzlisbon", name:"Four Seasons Hotel Ritz Lisbon", city:"Lisbon", country:"Portugal", lat:38.7260, lng:-9.1530, program:"FHR"},
+    {id:"hoteldeparis", name:"Hôtel de Paris Monte-Carlo", city:"Monte Carlo", country:"Monaco", lat:43.7390, lng:7.4280, program:"FHR"},
+    {id:"badrutts", name:"Badrutt's Palace Hotel", city:"St. Moritz", country:"Switzerland", lat:46.4910, lng:9.8410, program:"FHR"},
+    {id:"dolder", name:"The Dolder Grand", city:"Zurich", country:"Switzerland", lat:47.3730, lng:8.5730, program:"FHR"},
+    {id:"sacher", name:"Hotel Sacher Wien", city:"Vienna", country:"Austria", lat:48.2040, lng:16.3690, program:"FHR"},
+    {id:"adlon", name:"Hotel Adlon Kempinski", city:"Berlin", country:"Germany", lat:52.5160, lng:13.3800, program:"FHR"},
+    {id:"waamsterdam", name:"Waldorf Astoria Amsterdam", city:"Amsterdam", country:"Netherlands", lat:52.3660, lng:4.8950, program:"FHR"},
+    {id:"conservatorium", name:"Conservatorium Hotel", city:"Amsterdam", country:"Netherlands", lat:52.3580, lng:4.8790, program:"FHR"},
+    {id:"astir", name:"Four Seasons Astir Palace", city:"Athens", country:"Greece", lat:37.8060, lng:23.7770, program:"FHR"},
+    {id:"gracesantorini", name:"Grace Hotel Santorini, Auberge", city:"Santorini", country:"Greece", lat:36.4250, lng:25.4310, program:"FHR"},
+    {id:"ciragan", name:"Çırağan Palace Kempinski", city:"Istanbul", country:"Türkiye", lat:41.0440, lng:29.0190, program:"FHR"},
+    {id:"fsbosphorus", name:"Four Seasons Hotel Istanbul at the Bosphorus", city:"Istanbul", country:"Türkiye", lat:41.0410, lng:29.0010, program:"FHR"},
+    // — expanded seed: Asia / Pacific / Middle East —
+    {id:"motokyo", name:"Mandarin Oriental, Tokyo", city:"Tokyo", country:"Japan", lat:35.6870, lng:139.7730, program:"FHR"},
+    {id:"fsotemachi", name:"Four Seasons Hotel Tokyo at Otemachi", city:"Tokyo", country:"Japan", lat:35.6880, lng:139.7660, program:"FHR"},
+    {id:"janu", name:"Janu Tokyo", city:"Tokyo", country:"Japan", lat:35.6620, lng:139.7300, program:"FHR"},
+    {id:"okura", name:"The Okura Tokyo", city:"Tokyo", country:"Japan", lat:35.6660, lng:139.7440, program:"FHR"},
+    {id:"bulgaritokyo", name:"Bulgari Hotel Tokyo", city:"Tokyo", country:"Japan", lat:35.6810, lng:139.7680, program:"FHR"},
+    {id:"rckyoto", name:"The Ritz-Carlton, Kyoto", city:"Kyoto", country:"Japan", lat:35.0170, lng:135.7720, program:"FHR"},
+    {id:"fskyoto", name:"Four Seasons Hotel Kyoto", city:"Kyoto", country:"Japan", lat:34.9910, lng:135.7790, program:"FHR"},
+    {id:"amankyoto", name:"Aman Kyoto", city:"Kyoto", country:"Japan", lat:35.0640, lng:135.7290, program:"FHR"},
+    {id:"rcosaka", name:"The Ritz-Carlton, Osaka", city:"Osaka", country:"Japan", lat:34.6970, lng:135.4920, program:"FHR"},
+    {id:"josunpalace", name:"Josun Palace Seoul", city:"Seoul", country:"South Korea", lat:37.5040, lng:127.0470, program:"THC"},
+    {id:"phseoul", name:"Park Hyatt Seoul", city:"Seoul", country:"South Korea", lat:37.5080, lng:127.0600, program:"FHR"},
+    {id:"rosewoodhk", name:"Rosewood Hong Kong", city:"Hong Kong", country:"Hong Kong", lat:22.2940, lng:114.1740, program:"FHR"},
+    {id:"fshk", name:"Four Seasons Hotel Hong Kong", city:"Hong Kong", country:"Hong Kong", lat:22.2860, lng:114.1570, program:"FHR"},
+    {id:"upperhouse", name:"The Upper House", city:"Hong Kong", country:"Hong Kong", lat:22.2770, lng:114.1660, program:"FHR"},
+    {id:"mbs", name:"Marina Bay Sands", city:"Singapore", country:"Singapore", lat:1.2834, lng:103.8607, program:"FHR"},
+    {id:"shangrisg", name:"Shangri-La Singapore", city:"Singapore", country:"Singapore", lat:1.3110, lng:103.8270, program:"THC"},
+    {id:"fsbkk", name:"Four Seasons Hotel Bangkok at Chao Phraya River", city:"Bangkok", country:"Thailand", lat:13.7060, lng:100.5100, program:"FHR"},
+    {id:"capellabkk", name:"Capella Bangkok", city:"Bangkok", country:"Thailand", lat:13.7050, lng:100.5110, program:"FHR"},
+    {id:"thesiam", name:"The Siam", city:"Bangkok", country:"Thailand", lat:13.7740, lng:100.5060, program:"FHR"},
+    {id:"phsaigon", name:"Park Hyatt Saigon", city:"Ho Chi Minh City", country:"Vietnam", lat:10.7780, lng:106.7030, program:"FHR"},
+    {id:"metropole", name:"Sofitel Legend Metropole Hanoi", city:"Hanoi", country:"Vietnam", lat:21.0250, lng:105.8550, program:"THC"},
+    {id:"datai", name:"The Datai Langkawi", city:"Langkawi", country:"Malaysia", lat:6.4290, lng:99.6800, program:"FHR"},
+    {id:"fskl", name:"Four Seasons Hotel Kuala Lumpur", city:"Kuala Lumpur", country:"Malaysia", lat:3.1550, lng:101.7150, program:"FHR"},
+    {id:"motaipei", name:"Mandarin Oriental, Taipei", city:"Taipei", country:"Taiwan", lat:25.0560, lng:121.5440, program:"FHR"},
+    {id:"bulgaribali", name:"Bulgari Resort Bali", city:"Uluwatu, Bali", country:"Indonesia", lat:-8.8310, lng:115.1170, program:"FHR"},
+    {id:"amankila", name:"Amankila", city:"Manggis, Bali", country:"Indonesia", lat:-8.5100, lng:115.5200, program:"FHR"},
+    {id:"stregbali", name:"The St. Regis Bali Resort", city:"Nusa Dua, Bali", country:"Indonesia", lat:-8.8030, lng:115.2310, program:"FHR"},
+    {id:"amanpuri", name:"Amanpuri", city:"Phuket", country:"Thailand", lat:7.9840, lng:98.2780, program:"FHR"},
+    {id:"rosewoodphuket", name:"Rosewood Phuket", city:"Phuket", country:"Thailand", lat:7.8870, lng:98.2710, program:"FHR"},
+    {id:"ithaafushi", name:"Waldorf Astoria Maldives Ithaafushi", city:"South Malé Atoll", country:"Maldives", lat:3.9670, lng:73.4170, program:"FHR"},
+    {id:"landaa", name:"Four Seasons Resort Maldives at Landaa Giraavaru", city:"Baa Atoll", country:"Maldives", lat:5.2870, lng:73.1130, program:"FHR"},
+    {id:"fsjumeirah", name:"Four Seasons Resort Dubai at Jumeirah Beach", city:"Dubai", country:"UAE", lat:25.2010, lng:55.2400, program:"FHR"},
+    {id:"oopalm", name:"One&Only The Palm", city:"Dubai", country:"UAE", lat:25.0990, lng:55.1170, program:"FHR"},
+    {id:"capellasyd", name:"Capella Sydney", city:"Sydney", country:"Australia", lat:-33.8640, lng:151.2120, program:"FHR"},
+    {id:"crownsyd", name:"Crown Towers Sydney", city:"Sydney", country:"Australia", lat:-33.8650, lng:151.2010, program:"FHR"}
+  ],
+  promos: [
+    {hotelId:"amangiri",  type:"nth_night_free", n:3, stayStart:"2026-09-01", stayEnd:"2026-12-18", minNights:3, sample:true},
+    {hotelId:"mayakoba",  type:"nth_night_free", n:4, stayStart:"2026-08-15", stayEnd:"2026-11-20", minNights:4, sample:true},
+    {hotelId:"claridges", type:"pct_off", pct:15, stayStart:"2026-06-01", stayEnd:"2026-09-30", bookBy:"2026-08-31", sample:true},
+    {hotelId:"wynn",      type:"credit", amount:150, stayStart:"2026-06-15", stayEnd:"2026-08-31", minNights:2, sample:true},
+    {hotelId:"palmilla",  type:"nth_night_free", n:4, stayStart:"2026-07-01", stayEnd:"2026-10-15", minNights:4, sample:true},
+    {hotelId:"halekulani",type:"nth_night_free", n:5, stayStart:"2026-09-01", stayEnd:"2026-12-15", minNights:5, sample:true},
+    {hotelId:"phkyoto",   type:"pct_off", pct:15, stayStart:"2026-10-01", stayEnd:"2027-02-28", bookBy:"2026-09-30", sample:true},
+    {hotelId:"banff",     type:"nth_night_free", n:3, stayStart:"2026-11-01", stayEnd:"2027-03-31", minNights:3, sample:true},
+    {hotelId:"raffles",   type:"credit", amount:200, stayStart:"2026-07-01", stayEnd:"2026-09-30", minNights:3, sample:true},
+    {hotelId:"setai",     type:"nth_night_free", n:4, stayStart:"2026-08-01", stayEnd:"2026-10-31", minNights:4, sample:true}
+  ]
+};
+
+const BENEFITS = {
+  FHR: "Noon check-in (when available) · room upgrade (when available) · daily breakfast for two · $100 experience credit · guaranteed 4pm late checkout. Book with Platinum or Centurion via Amex Travel.",
+  THC: "$100 hotel credit toward eligible charges · room upgrade (when available). Requires a 2-night minimum stay booked via Amex Travel."
+};
+const AMEX_URL = {
+  FHR: "https://www.americanexpress.com/en-us/travel/discover/fine-hotels-resorts",
+  THC: "https://www.americanexpress.com/en-us/travel/discover/the-hotel-collection"
+};
+const LS_KEY = "stayLedgerData_v1";
+
+/* =========================================================
+   Brand detection — name patterns → parent loyalty group.
+   Checked top-down against a normalized (lowercase, accent-
+   stripped) name, so put specific sub-brands before parents.
+   ========================================================= */
+const BRAND_RULES = [
+  // Marriott Bonvoy
+  [/jw marriott/,"Marriott Bonvoy","JW Marriott"],
+  [/ritz carlton/,"Marriott Bonvoy","The Ritz-Carlton"],
+  [/st regis/,"Marriott Bonvoy","St. Regis"],
+  [/luxury collection/,"Marriott Bonvoy","The Luxury Collection"],
+  [/\bedition\b/,"Marriott Bonvoy","EDITION"],
+  [/\bbulgari\b/,"Marriott Bonvoy","Bulgari"],
+  [/\bwestin\b/,"Marriott Bonvoy","Westin"],
+  [/\bsheraton\b/,"Marriott Bonvoy","Sheraton"],
+  [/le meridien/,"Marriott Bonvoy","Le Méridien"],
+  [/autograph/,"Marriott Bonvoy","Autograph Collection"],
+  [/tribute portfolio/,"Marriott Bonvoy","Tribute Portfolio"],
+  [/\brenaissance\b/,"Marriott Bonvoy","Renaissance"],
+  [/\bcourtyard\b/,"Marriott Bonvoy","Courtyard"],
+  [/four points/,"Marriott Bonvoy","Four Points"],
+  [/residence inn/,"Marriott Bonvoy","Residence Inn"],
+  [/fairfield/,"Marriott Bonvoy","Fairfield"],
+  [/springhill/,"Marriott Bonvoy","SpringHill Suites"],
+  [/towneplace/,"Marriott Bonvoy","TownePlace Suites"],
+  [/\bac hotel/,"Marriott Bonvoy","AC Hotels"],
+  [/\baloft\b/,"Marriott Bonvoy","Aloft"],
+  [/\belement\b/,"Marriott Bonvoy","Element"],
+  [/\bmoxy\b/,"Marriott Bonvoy","Moxy"],
+  [/delta hotels/,"Marriott Bonvoy","Delta Hotels"],
+  [/\bgaylord\b/,"Marriott Bonvoy","Gaylord"],
+  [/\bprotea\b/,"Marriott Bonvoy","Protea"],
+  [/^w\s|\bw hotel/,"Marriott Bonvoy","W Hotels"],
+  [/\bmarriott\b/,"Marriott Bonvoy","Marriott"],
+  // Hilton Honors
+  [/waldorf astoria/,"Hilton Honors","Waldorf Astoria"],
+  [/\bconrad\b/,"Hilton Honors","Conrad"],
+  [/\blxr\b/,"Hilton Honors","LXR"],
+  [/canopy by/,"Hilton Honors","Canopy"],
+  [/\bsignia\b/,"Hilton Honors","Signia"],
+  [/\bcurio\b/,"Hilton Honors","Curio Collection"],
+  [/doubletree/,"Hilton Honors","DoubleTree"],
+  [/tapestry/,"Hilton Honors","Tapestry Collection"],
+  [/embassy suites/,"Hilton Honors","Embassy Suites"],
+  [/tru by hilton/,"Hilton Honors","Tru"],
+  [/\bhampton\b/,"Hilton Honors","Hampton"],
+  [/homewood/,"Hilton Honors","Homewood Suites"],
+  [/home2/,"Hilton Honors","Home2 Suites"],
+  [/motto by/,"Hilton Honors","Motto"],
+  [/spark by hilton/,"Hilton Honors","Spark"],
+  [/\bhilton\b/,"Hilton Honors","Hilton"],
+  // World of Hyatt
+  [/park hyatt/,"World of Hyatt","Park Hyatt"],
+  [/grand hyatt/,"World of Hyatt","Grand Hyatt"],
+  [/\bandaz\b/,"World of Hyatt","Andaz"],
+  [/\balila\b/,"World of Hyatt","Alila"],
+  [/\bthompson\b/,"World of Hyatt","Thompson Hotels"],
+  [/\bmiraval\b/,"World of Hyatt","Miraval"],
+  [/hyatt centric/,"World of Hyatt","Hyatt Centric"],
+  [/hyatt regency/,"World of Hyatt","Hyatt Regency"],
+  [/hyatt place/,"World of Hyatt","Hyatt Place"],
+  [/hyatt house/,"World of Hyatt","Hyatt House"],
+  [/destination by hyatt/,"World of Hyatt","Destination"],
+  [/caption by hyatt/,"World of Hyatt","Caption"],
+  [/\bhyatt\b/,"World of Hyatt","Hyatt"],
+  // IHG One Rewards
+  [/intercontinental/,"IHG One Rewards","InterContinental"],
+  [/six senses/,"IHG One Rewards","Six Senses"],
+  [/\bregent\b/,"IHG One Rewards","Regent"],
+  [/\bkimpton\b/,"IHG One Rewards","Kimpton"],
+  [/hotel indigo/,"IHG One Rewards","Hotel Indigo"],
+  [/\bvoco\b/,"IHG One Rewards","voco"],
+  [/crowne plaza/,"IHG One Rewards","Crowne Plaza"],
+  [/holiday inn/,"IHG One Rewards","Holiday Inn"],
+  [/even hotel/,"IHG One Rewards","EVEN Hotels"],
+  [/staybridge/,"IHG One Rewards","Staybridge Suites"],
+  [/candlewood/,"IHG One Rewards","Candlewood Suites"],
+  [/avid hotel/,"IHG One Rewards","avid"],
+  [/\bhualuxe\b/,"IHG One Rewards","HUALUXE"],
+  // Accor ALL
+  [/\braffles\b/,"Accor ALL","Raffles"],
+  [/orient express/,"Accor ALL","Orient Express"],
+  [/\bfairmont\b/,"Accor ALL","Fairmont"],
+  [/\bsofitel\b/,"Accor ALL","Sofitel"],
+  [/mgallery/,"Accor ALL","MGallery"],
+  [/\bpullman\b/,"Accor ALL","Pullman"],
+  [/swissotel/,"Accor ALL","Swissôtel"],
+  [/movenpick/,"Accor ALL","Mövenpick"],
+  [/grand mercure/,"Accor ALL","Grand Mercure"],
+  [/\bmercure\b/,"Accor ALL","Mercure"],
+  [/\bnovotel\b/,"Accor ALL","Novotel"],
+  [/\bibis\b/,"Accor ALL","ibis"],
+  [/mama shelter/,"Accor ALL","Mama Shelter"],
+  [/\bmondrian\b/,"Accor ALL","Mondrian"],
+  [/\bdelano\b/,"Accor ALL","Delano"],
+  [/\bsls\b/,"Accor ALL","SLS"],
+  // Wyndham
+  [/\bwyndham\b/,"Wyndham Rewards","Wyndham"],
+  [/\bramada\b/,"Wyndham Rewards","Ramada"],
+  [/days inn/,"Wyndham Rewards","Days Inn"],
+  [/super 8/,"Wyndham Rewards","Super 8"],
+  [/la quinta/,"Wyndham Rewards","La Quinta"],
+  [/baymont/,"Wyndham Rewards","Baymont"],
+  [/microtel/,"Wyndham Rewards","Microtel"],
+  [/wingate/,"Wyndham Rewards","Wingate"],
+  [/howard johnson/,"Wyndham Rewards","Howard Johnson"],
+  [/registry collection/,"Wyndham Rewards","Registry Collection"],
+  [/dolce by wyndham|dolce hotels/,"Wyndham Rewards","Dolce"],
+  [/travelodge/,"Wyndham Rewards","Travelodge"],
+  // Choice
+  [/comfort inn|comfort suites|comfort hotel/,"Choice Privileges","Comfort"],
+  [/quality inn/,"Choice Privileges","Quality Inn"],
+  [/sleep inn/,"Choice Privileges","Sleep Inn"],
+  [/\bclarion\b/,"Choice Privileges","Clarion"],
+  [/\bcambria\b/,"Choice Privileges","Cambria"],
+  [/econo lodge/,"Choice Privileges","Econo Lodge"],
+  [/rodeway/,"Choice Privileges","Rodeway"],
+  // Radisson / Best Western
+  [/radisson/,"Radisson Hotel Group","Radisson"],
+  [/park plaza/,"Radisson Hotel Group","Park Plaza"],
+  [/country inn/,"Radisson Hotel Group","Country Inn & Suites"],
+  [/best western|surestay/,"Best Western","Best Western"],
+  // Luxury groups & notable independents
+  [/four seasons/,"Four Seasons","Four Seasons"],
+  [/mandarin oriental/,"Mandarin Oriental","Mandarin Oriental"],
+  [/\bpeninsula\b/,"Peninsula (HSH)","The Peninsula"],
+  [/rosewood/,"Rosewood","Rosewood"],
+  [/^aman\b|\baman(giri|gani|yara|jena|puri|ruya|kila|kora|bagh|dari|wana|usa|emu|noi|taka|zoe|era|vari)\b/,"Aman","Aman"],
+  [/shangri la/,"Shangri-La","Shangri-La"],
+  [/kempinski/,"Kempinski","Kempinski"],
+  [/\boberoi\b/,"Oberoi","Oberoi"],
+  [/\btaj\b/,"IHCL (Taj)","Taj"],
+  [/\blangham\b/,"Langham","The Langham"],
+  [/\bcordis\b/,"Langham","Cordis"],
+  [/belmond/,"Belmond (LVMH)","Belmond"],
+  [/cheval blanc/,"LVMH","Cheval Blanc"],
+  [/one only/,"Kerzner","One&Only"],
+  [/\batlantis\b/,"Kerzner","Atlantis"],
+  [/\bmontage\b/,"Montage Hospitality","Montage"],
+  [/\bpendry\b/,"Montage Hospitality","Pendry"],
+  [/auberge/,"Auberge Resorts","Auberge"],
+  [/\bloews\b/,"Loews","Loews"],
+  [/\bomni\b/,"Omni","Omni"],
+  [/sonesta/,"Sonesta","Sonesta"],
+  [/dorchester|45 park lane|coworth park|le meurice|plaza athenee|principe di savoia|hotel bel air|beverly hills hotel/,"Dorchester Collection","Dorchester Collection"],
+  [/le bristol|brenners|lanesborough|eden rock|jumby bay|woodward/,"Oetker Collection","Oetker Collection"],
+  [/\bcapella\b/,"Capella","Capella"],
+  [/jumeirah|burj al arab/,"Jumeirah","Jumeirah"],
+  [/\bsoneva\b/,"Soneva","Soneva"],
+  [/\bviceroy\b/,"Viceroy","Viceroy"],
+  [/\bnobu\b/,"Nobu Hospitality","Nobu"],
+  [/\b1 hotel|baccarat/,"SH Hotels","1 Hotels / Baccarat"],
+  [/\bokura\b|hotel nikko|nikko hotel/,"Okura Nikko","Okura Nikko"],
+  [/\blotte\b/,"Lotte Hotels","Lotte"],
+  [/\bshilla\b/,"The Shilla","Shilla"],
+  [/\bjosun\b/,"Josun Hotels","Josun"],
+  [/hoshinoya|hoshino/,"Hoshino Resorts","Hoshino"],
+  [/prince hotel/,"Seibu Prince","Prince Hotels"],
+  [/\bdusit\b/,"Dusit","Dusit"],
+  [/\bcentara\b/,"Centara","Centara"],
+  [/pan pacific|parkroyal/,"Pan Pacific","Pan Pacific / Parkroyal"],
+  [/millennium|copthorne/,"Millennium","Millennium & Copthorne"],
+  [/\bscandic\b/,"Scandic","Scandic"],
+  [/motel one/,"Motel One","Motel One"],
+  [/premier inn/,"Whitbread","Premier Inn"],
+  [/citizenm/,"citizenM","citizenM"],
+  [/ace hotel/,"Ace Hotels","Ace"],
+  [/virgin hotel/,"Virgin Hotels","Virgin"],
+  [/hard rock/,"Hard Rock","Hard Rock"],
+  [/\bmelia\b/,"Meliá","Meliá"],
+  [/\bbarcelo\b/,"Barceló","Barceló"],
+  [/\briu\b/,"RIU","RIU"],
+  [/iberostar/,"Iberostar","Iberostar"],
+  [/nh collection|nh hotel/,"Minor (NH)","NH"],
+  [/anantara|\bavani\b|\btivoli\b/,"Minor Hotels","Anantara / Avani / Tivoli"],
+  [/banyan tree|angsana|\bcassia\b/,"Banyan Group","Banyan Tree"],
+  [/como (metropolitan|shambhala|uma|point|maalifushi|laucala|treasury|alpina)/,"COMO","COMO"],
+  // Vegas operators
+  [/\bbellagio\b|aria resort|\bvdara\b|mandalay bay|\bmgm\b|\bluxor\b|excalibur|cosmopolitan (of )?las vegas/,"MGM Resorts","MGM Resorts"],
+  [/\bwynn\b|\bencore\b/,"Wynn Resorts","Wynn / Encore"],
+  [/caesars|harrah|horseshoe|planet hollywood|flamingo las vegas/,"Caesars","Caesars Entertainment"],
+  [/\bdisney\b/,"Disney","Disney Resorts"]
+];
+
+function normLite(s){
+  return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[^a-z0-9]+/g," ").trim();
+}
+function normName(s){ // heavier — used only for FHR/THC ↔ OSM dedupe
+  return normLite(s).replace(/\b(the|hotel|hotels|resort|resorts|and|at|spa|by)\b/g," ")
+    .replace(/\s+/g," ").trim();
+}
+function detectBrand(name, tags){
+  tags = tags || {};
+  const candidates = [normLite(name)];
+  if(tags.brand) candidates.push(normLite(tags.brand));
+  if(tags.operator) candidates.push(normLite(tags.operator));
+  for(const c of candidates){
+    if(!c) continue;
+    for(const [re, group, brand] of BRAND_RULES){
+      if(re.test(c)) return {group, brand};
+    }
+  }
+  if(tags.brand) return {group:"Independent / Other", brand:tags.brand};
+  return {group:"Independent / Other", brand:""};
+}
+const brandCache = new Map();
+function brandOf(h){
+  if(h.brandGroup) return {group:h.brandGroup, brand:h.brandLabel || ""};
+  if(!brandCache.has(h.id)) brandCache.set(h.id, detectBrand(h.name, {}));
+  return brandCache.get(h.id);
+}
+function brandShort(group){
+  if(group === "Independent / Other") return "INDEP";
+  return group.split(/[ (\/]/)[0].toUpperCase();
+}
+
+/* ---------- OSM (Overpass) hotel loading ---------- */
+let osmHotels = [];
+const osmSeen = new Set();
+
+function matchAmex(name, lat, lng){
+  const n = normName(name);
+  if(!n) return null;
+  for(const h of data.hotels){
+    if(Math.abs(h.lat - lat) > 0.01 || Math.abs(h.lng - lng) > 0.015) continue; // ~1 km
+    const dn = normName(h.name);
+    if(dn === n || (n.length >= 6 && (dn.includes(n) || n.includes(dn)))) return h;
+  }
+  return null;
+}
+
+async function loadOsmHotels(btn){
+  if(map.getZoom() < 11){
+    toast("Zoom in to city level first, then press Load hotels in view.");
+    return;
+  }
+  const b = map.getBounds();
+  const bbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].map(x => x.toFixed(5)).join(",");
+  const query = '[out:json][timeout:25];(' +
+    'node["tourism"="hotel"](' + bbox + ');' +
+    'way["tourism"="hotel"](' + bbox + ');' +
+    'relation["tourism"="hotel"](' + bbox + '););out center 400;';
+  btn.disabled = true; const prev = btn.textContent; btn.textContent = "Loading…";
+  try{
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      headers: {"Content-Type": "application/x-www-form-urlencoded"},
+      body: "data=" + encodeURIComponent(query)
+    });
+    if(!res.ok) throw new Error("Overpass " + res.status);
+    const json = await res.json();
+    let added = 0, merged = 0;
+    for(const el of (json.elements || [])){
+      const tags = el.tags || {};
+      const name = tags["name:en"] || tags.name;
+      if(!name) continue;
+      const lat = (el.lat != null) ? el.lat : (el.center && el.center.lat);
+      const lng = (el.lon != null) ? el.lon : (el.center && el.center.lon);
+      if(lat == null || lng == null) continue;
+      const key = el.type + "/" + el.id;
+      if(osmSeen.has(key)) continue;
+      osmSeen.add(key);
+      if(matchAmex(name, lat, lng)){ merged++; continue; } // already on the map as FHR/THC
+      const det = detectBrand(name, tags);
+      osmHotels.push({
+        id: "osm_" + el.type + el.id,
+        name, lat, lng, program: "STD",
+        city: tags["addr:city"] || "", country: tags["addr:country"] || "",
+        brandGroup: det.group, brandLabel: det.brand,
+        stars: tags.stars || ""
+      });
+      added++;
+    }
+    toast(added + " hotels loaded from OpenStreetMap" + (merged ? " · " + merged + " matched to FHR/THC" : ""));
+    render();
+  }catch(e){
+    toast("Couldn't load hotels: " + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = prev;
+  }
+}
+
+function allHotels(){ return data.hotels.concat(osmHotels); }
+
+/* Quick add: paste hotel names copied from the Amex Travel pages;
+   each is geocoded once via Nominatim and stored as FHR/THC. */
+async function quickAddHotels(){
+  const namesEl = document.getElementById("qaNames");
+  const out = document.getElementById("qaOut");
+  const btn = document.getElementById("qaGo");
+  const prog = document.getElementById("qaProg").value;
+  const lines = namesEl.value.split("\n").map(s => s.trim()).filter(Boolean);
+  if(!lines.length){ out.textContent = "Paste at least one hotel name first."; return; }
+  btn.disabled = true;
+  let okN = 0; const fails = [];
+  for(let i = 0; i < lines.length; i++){
+    out.textContent = "Locating " + (i + 1) + "/" + lines.length + "… (" + lines[i].slice(0, 30) + ")";
+    try{
+      const res = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(lines[i]));
+      const js = await res.json();
+      if(js && js[0]){
+        const r = js[0];
+        const parts = (r.display_name || "").split(",").map(s => s.trim());
+        const nameOnly = lines[i].split(",")[0].trim();
+        const cityHint = (lines[i].split(",")[1] || "").trim();
+        const id = "qa_" + nameOnly.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24) + "_" + Math.random().toString(36).slice(2, 6);
+        data.hotels.push({
+          id, name: nameOnly,
+          city: cityHint || parts[Math.max(0, parts.length - 4)] || "",
+          country: parts[parts.length - 1] || "",
+          lat: parseFloat(r.lat), lng: parseFloat(r.lon),
+          program: prog
+        });
+        okN++;
+      } else fails.push(lines[i]);
+    }catch(e){ fails.push(lines[i]); }
+    if(i < lines.length - 1) await new Promise(r => setTimeout(r, 1100)); // Nominatim rate limit
+  }
+  saveData(data);
+  render();
+  const ta = document.getElementById("dataTa");
+  if(ta) ta.value = JSON.stringify(data, null, 2);
+  namesEl.value = fails.join("\n");
+  out.textContent = okN + " added as " + prog +
+    (fails.length ? " · " + fails.length + " not found (left in the box — add a city and retry)" : ".");
+  btn.disabled = false;
+}
+
+/* =========================================================
+   Points vs cash — per-program point valuations (editable
+   in Data → pointValues). cpp = baseline cents per point,
+   mr = Amex Membership Rewards transfer ratio (0 = none).
+   Community-average estimates; tune them to your own math.
+   ========================================================= */
+const DEFAULT_POINT_VALUES = {
+  mrBaseline: 2.0, // ¢ you expect per MR point on a good redemption
+  programs: {
+    "Marriott Bonvoy":      {program:"Marriott Bonvoy",            cpp:0.8, mr:1},
+    "Hilton Honors":        {program:"Hilton Honors",              cpp:0.5, mr:2},
+    "World of Hyatt":       {program:"World of Hyatt",             cpp:1.7, mr:0},
+    "IHG One Rewards":      {program:"IHG One Rewards",            cpp:0.5, mr:0},
+    "Accor ALL":            {program:"Accor ALL (fixed €40/2,000)",cpp:2.2, mr:0},
+    "Wyndham Rewards":      {program:"Wyndham Rewards",            cpp:1.0, mr:0},
+    "Choice Privileges":    {program:"Choice Privileges",          cpp:0.6, mr:1},
+    "Best Western":         {program:"Best Western Rewards",       cpp:0.6, mr:0},
+    "Radisson Hotel Group": {program:"Radisson Rewards",           cpp:0.4, mr:0}
+  }
+};
+function pointValues(){ return data.pointValues || DEFAULT_POINT_VALUES; }
+function pointConf(h){
+  const pv = pointValues();
+  return (pv.programs && pv.programs[brandOf(h).group]) || null;
+}
+
+const calcCache = {};
+
+/* Award deep links — open the brand's own site with your dates
+   (and the points/reward toggle pre-set where the URL supports it),
+   so the number you enter is the real one, never a guess. */
+function brandAwardLink(h){
+  const g = brandOf(h).group;
+  const q = encodeURIComponent(h.name + (h.city ? " " + h.city : ""));
+  const [y1,m1,d1] = state.ci.split("-");
+  const [y2,m2,d2] = state.co.split("-");
+  const us1 = encodeURIComponent(m1 + "/" + d1 + "/" + y1);
+  const us2 = encodeURIComponent(m2 + "/" + d2 + "/" + y2);
+  switch(g){
+    case "Hilton Honors":
+      return {label:"Hilton (points mode)", url:"https://www.hilton.com/en/search/?query=" + q +
+        "&arrivalDate=" + state.ci + "&departureDate=" + state.co + "&redeemPts=true"};
+    case "Marriott Bonvoy":
+      return {label:"Marriott (points mode)", url:"https://www.marriott.com/search/submitSearch.mi?destinationAddress.destination=" + q +
+        "&fromDate=" + us1 + "&toDate=" + us2 + "&useRewardsPoints=true"};
+    case "World of Hyatt":
+      return {label:"Hyatt (flip “Use points”)", url:"https://www.hyatt.com/search/" + encodeURIComponent(h.city || h.name) +
+        "?checkinDate=" + state.ci + "&checkoutDate=" + state.co + "&rooms=1&adults=2"};
+    case "IHG One Rewards":
+      return {label:"IHG (Reward Nights)", url:"https://www.ihg.com/hotels/us/en/find-hotels/hotel-search?qDest=" + q +
+        "&qCiD=" + Number(d1) + "&qCiMy=" + (Number(m1) - 1) + y1 +
+        "&qCoD=" + Number(d2) + "&qCoMy=" + (Number(m2) - 1) + y2 +
+        "&qAdlt=2&qRms=1&qRtP=IVANI"};
+    case "Accor ALL":
+      return {label:"Accor ALL", url:"https://all.accor.com/usa/index.en.shtml"};
+    case "Wyndham Rewards":
+      return {label:"Wyndham", url:"https://www.wyndhamhotels.com/wyndham-rewards"};
+    case "Choice Privileges":
+      return {label:"Choice Hotels", url:"https://www.choicehotels.com/"};
+    case "Best Western":
+      return {label:"Best Western", url:"https://www.bestwestern.com/"};
+    default:
+      return null;
+  }
+}
+
+function awardKey(hid){ return hid + "|" + state.ci + "|" + state.co; }
+
+function pcBaselineText(conf){
+  return "No estimates here — check the live award price on the brand site for these exact dates, then enter the real cash total and points. Your entry is saved for this date range.";
+}
+
+function pointsPanelHTML(h){
+  const conf = pointConf(h);
+  if(!conf) return "";
+  const saved = (data.awardLog || {})[awardKey(h.id)];
+  const c = saved || calcCache[awardKey(h.id)] || {};
+  const al = brandAwardLink(h);
+  return (
+    '<div class="ben"><b>Points vs cash — ' + esc(conf.program) + '</b>' +
+      (al ? '<a class="pc-link" target="_blank" rel="noopener" href="' + al.url + '">Live award price for your dates: ' + esc(al.label) + ' ↗</a>' : '') +
+      '<div class="pc-row">' +
+        '<input id="pc_cash_' + h.id + '" type="number" min="0" step="1" placeholder="Cash total $" value="' + esc(c.cash || "") + '" oninput="calcPoints(\'' + h.id + '\')">' +
+        '<input id="pc_pts_' + h.id + '" type="number" min="0" step="1000" placeholder="Points (from brand site)" value="' + esc(c.pts || "") + '" oninput="calcPoints(\'' + h.id + '\')">' +
+      '</div>' +
+      '<div id="pc_out_' + h.id + '" class="pc-out">' +
+        (c.cash || c.pts ? "" : pcBaselineText(conf)) +
+      '</div>' +
+    '</div>'
+  );
+}
+
+function calcPoints(hid){
+  const h = allHotels().find(x => x.id === hid);
+  if(!h) return;
+  const conf = pointConf(h);
+  const cashEl = document.getElementById("pc_cash_" + hid);
+  const ptsEl = document.getElementById("pc_pts_" + hid);
+  const out = document.getElementById("pc_out_" + hid);
+  if(!conf || !out) return;
+  const key = awardKey(hid);
+  calcCache[key] = {cash: cashEl.value, pts: ptsEl.value};
+  // persist real entries per hotel + date range (never estimated)
+  if(!data.awardLog) data.awardLog = {};
+  if(cashEl.value || ptsEl.value){
+    data.awardLog[key] = {cash: cashEl.value, pts: ptsEl.value, savedAt: todayISO()};
+  } else {
+    delete data.awardLog[key];
+  }
+  saveData(data);
+
+  const cash = parseFloat(cashEl.value);
+  const pts = parseFloat(ptsEl.value);
+  const pv = pointValues();
+  const savedNote = '<br><span class="pc-saved">Recorded for ' + fmtNice(state.ci) + ' → ' + fmtNice(state.co) + ' · your entry from the brand site, not an estimate.</span>';
+
+  if(cash > 0 && pts > 0){
+    const cpp = cash * 100 / pts;
+    const ratio = cpp / conf.cpp;
+    let html = ratio >= 1
+      ? '<span class="v-ok">USE POINTS</span> — you\u2019d get ' + cpp.toFixed(2) + "¢/pt, " +
+        Math.round((ratio - 1) * 100) + "% above the " + conf.cpp.toFixed(1) + "¢ baseline."
+      : '<span class="v-bad">PAY CASH</span> — only ' + cpp.toFixed(2) + "¢/pt, " +
+        Math.round((1 - ratio) * 100) + "% below the " + conf.cpp.toFixed(1) + "¢ baseline.";
+    if(conf.mr > 0){
+      const perMR = cpp * conf.mr;
+      html += "<br>Via Amex MR transfer (1:" + conf.mr + "): " + perMR.toFixed(2) + "¢ per MR — " +
+        (perMR >= pv.mrBaseline ? "beats" : "below") + " your " + pv.mrBaseline.toFixed(1) + "¢ MR baseline.";
+    }
+    html += "<br>Enter the cash rate with taxes included — award stays usually skip them, which tilts the math toward points.";
+    out.innerHTML = html + savedNote;
+  } else if(cash > 0){
+    out.innerHTML = "Break-even at baseline: " + Math.round(cash * 100 / conf.cpp).toLocaleString() +
+      " pts. If the brand site shows fewer points than that, points win." + savedNote;
+  } else if(pts > 0){
+    out.innerHTML = "Break-even at baseline: $" + Math.round(pts * conf.cpp / 100).toLocaleString() +
+      ". If the cash rate is higher than that, points win." + savedNote;
+  } else {
+    out.innerHTML = pcBaselineText(conf);
+  }
+}
+
+/* ---------- state ---------- */
+let data = loadData();
+let state = {
+  q: "",
+  programs: {FHR:true, THC:true, STD:true},
+  promoOnly: false,
+  brand: "",
+  ci: null, co: null
+};
+let map, cluster, markerById = {};
+
+/* ---------- persistence ---------- */
+function loadData(){
+  let d = null;
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(Array.isArray(parsed.hotels) && Array.isArray(parsed.promos)) d = parsed;
+    }
+  }catch(e){ /* storage unavailable — run in-memory */ }
+  if(!d) d = JSON.parse(JSON.stringify(SEED));
+  if(!d.pointValues) d.pointValues = JSON.parse(JSON.stringify(DEFAULT_POINT_VALUES));
+  if(!d.awardLog) d.awardLog = {};
+  // merge in any seed hotels/promos added in newer versions of this file
+  const ids = new Set(d.hotels.map(h => h.id));
+  for(const h of SEED.hotels) if(!ids.has(h.id)) d.hotels.push(JSON.parse(JSON.stringify(h)));
+  const pkey = p => p.hotelId + "|" + p.type + "|" + (p.stayStart || "");
+  const pset = new Set(d.promos.map(pkey));
+  for(const p of SEED.promos) if(!pset.has(pkey(p))) d.promos.push(JSON.parse(JSON.stringify(p)));
+  return d;
+}
+function saveData(d){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(d)); return true; }
+  catch(e){ return false; }
+}
+
+/* ---------- dates ---------- */
+function fmtISO(d){ return d.toISOString().slice(0,10); }
+function parseISO(s){ const [y,m,dd] = s.split("-").map(Number); return new Date(Date.UTC(y, m-1, dd)); }
+function nightsBetween(ci, co){ return Math.round((parseISO(co) - parseISO(ci)) / 86400000); }
+function fmtNice(s){
+  const d = parseISO(s);
+  return d.toLocaleDateString("en-US",{month:"short", day:"numeric", year:"numeric", timeZone:"UTC"});
+}
+function todayISO(){ return fmtISO(new Date()); }
+
+/* ---------- promo engine ---------- */
+function promoLabel(p){
+  if(p.type === "nth_night_free") return ordinal(p.n) + " night free";
+  if(p.type === "pct_off") return p.pct + "% off the rate";
+  if(p.type === "credit") return "$" + p.amount + " property credit";
+  return "Offer";
+}
+function ordinal(n){ return n + (["","st","nd","rd"][((n%100)<11||(n%100)>13) ? n%10 : 0] || "th"); }
+
+/**
+ * Evaluate one promo against the searched stay.
+ * Returns {status: 'ok'|'near'|'off', label, detail, savings}
+ *  ok   = your dates qualify
+ *  near = doesn't qualify, but a realistic adjustment would (different dates / longer stay)
+ *  off  = booking window has already closed
+ */
+function evalPromo(p, ci, co){
+  const nights = nightsBetween(ci, co);
+  const label = promoLabel(p) + (p.sample ? " " : "");
+  const today = todayISO();
+
+  if(p.bookBy && today > p.bookBy){
+    return {status:"off", label, detail:"Booking window ended " + fmtNice(p.bookBy) + "."};
+  }
+
+  const inWindow = ci >= p.stayStart && co <= p.stayEnd;
+  const minOK = !p.minNights || nights >= p.minNights;
+
+  if(inWindow && minOK){
+    let savings = "";
+    if(p.type === "nth_night_free") savings = " ≈ " + Math.round(100 / nights) + "% off a " + nights + "-night stay (one free night).";
+    if(p.type === "pct_off") savings = " Applies to your " + nights + "-night stay.";
+    if(p.type === "credit") savings = " Credited at the property.";
+    let extra = p.bookBy ? " Book by " + fmtNice(p.bookBy) + "." : "";
+    return {status:"ok", label, detail:"Your dates qualify." + savings + extra};
+  }
+
+  // near-miss messaging — this is the "note if a different period would qualify" logic
+  const parts = [];
+  if(!inWindow){
+    if(co <= p.stayStart) parts.push("Your stay is before the offer window — stays " + fmtNice(p.stayStart) + " – " + fmtNice(p.stayEnd) + " qualify.");
+    else if(ci >= p.stayEnd) parts.push("Your stay is after the offer window — it covered " + fmtNice(p.stayStart) + " – " + fmtNice(p.stayEnd) + ".");
+    else parts.push("Part of your stay falls outside the window — keep the full stay within " + fmtNice(p.stayStart) + " – " + fmtNice(p.stayEnd) + ".");
+  }
+  if(!minOK){
+    parts.push("Needs " + p.minNights + "+ nights (you searched " + nights + ").");
+  }
+  if(p.bookBy) parts.push("Book by " + fmtNice(p.bookBy) + ".");
+  // 'off' if the window is entirely in the past relative to today
+  if(p.stayEnd < today){
+    return {status:"off", label, detail:"Offer window has passed (" + fmtNice(p.stayStart) + " – " + fmtNice(p.stayEnd) + ")."};
+  }
+  return {status:"near", label, detail:parts.join(" ")};
+}
+
+function hotelPromoSummary(h){
+  const promos = data.promos.filter(p => p.hotelId === h.id);
+  if(!promos.length) return {status:"none", results:[]};
+  const results = promos.map(p => ({p, r: evalPromo(p, state.ci, state.co)}));
+  let status = "none";
+  if(results.some(x => x.r.status === "ok")) status = "ok";
+  else if(results.some(x => x.r.status === "near")) status = "near";
+  return {status, results};
+}
+
+/* ---------- deep links ---------- */
+function googleLink(h){
+  return "https://www.google.com/travel/search?q=" +
+    encodeURIComponent(h.name + " " + h.city) +
+    "&checkin=" + state.ci + "&checkout=" + state.co;
+}
+function amexLink(h){ return AMEX_URL[h.program] || AMEX_URL.FHR; }
+
+/* ---------- rendering ---------- */
+function filteredHotels(){
+  const q = state.q.trim().toLowerCase();
+  return allHotels().filter(h => {
+    if(!state.programs[h.program]) return false;
+    if(state.brand && brandOf(h).group !== state.brand) return false;
+    if(q && !((h.name + " " + h.city + " " + h.country).toLowerCase().includes(q))) return false;
+    if(state.promoOnly && hotelPromoSummary(h).status !== "ok") return false;
+    return true;
+  });
+}
+
+function statusText(s){
+  return s === "ok" ? "PROMO ✓" : s === "near" ? "NEAR MISS" : "NO PROMO";
+}
+
+function makeIcon(h, status){
+  const dot = status === "ok" ? '<span class="p-dot ok"></span>' :
+              status === "near" ? '<span class="p-dot near"></span>' : "";
+  const letter = h.program === "FHR" ? "F" : h.program === "THC" ? "H" : "·";
+  const size = h.program === "STD" ? 16 : 26;
+  return L.divIcon({
+    className: "",
+    html: '<div class="pin ' + h.program + '"><div class="p-seal">' + letter + '</div>' + dot + '</div>',
+    iconSize: [size,size], iconAnchor: [size/2,size/2], popupAnchor: [0,-12]
+  });
+}
+
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function popupHTML(h){
+  const br = brandOf(h);
+  const brandStr = br.group === "Independent / Other"
+    ? (br.brand ? esc(br.brand) + " · Independent" : "Independent / unaffiliated")
+    : esc(br.group) + (br.brand && br.brand !== br.group ? " · " + esc(br.brand) : "");
+  const badge = h.program === "STD"
+    ? '<span class="badge STD">HOTEL</span>'
+    : '<span class="badge ' + h.program + '">' + (h.program === "FHR" ? "FHR" : "HOTEL&nbsp;COLLECTION") + '</span>';
+  const place = [h.city, h.country].filter(Boolean).map(esc).join(", ");
+
+  let body = "";
+  if(h.program === "STD"){
+    body =
+      '<div class="promo off"><div class="pt">Not an FHR / Hotel Collection property</div>' +
+      '<div class="sub">No Amex Travel benefits or promos apply' +
+      (h.stars ? " · " + esc(h.stars) + "★ (OSM)" : "") +
+      '. If it actually belongs to FHR/THC, add it in Data.</div></div>';
+  } else {
+    const sum = hotelPromoSummary(h);
+    let promoHtml = "";
+    if(sum.results.length){
+      promoHtml = sum.results.map(({p, r}) =>
+        '<div class="promo ' + r.status + '">' +
+          '<div class="pt">' + esc(r.label) +
+            (p.sample ? '<span class="tag">SAMPLE</span>' : "") +
+            '<span class="tag">' + (r.status === "ok" ? "QUALIFIES" : r.status === "near" ? "NEAR MISS" : "EXPIRED") + '</span>' +
+          '</div>' +
+          '<div class="sub">' + esc(r.detail) + '</div>' +
+        '</div>'
+      ).join("");
+    } else {
+      promoHtml = '<div class="promo off"><div class="pt">No tracked promotions</div>' +
+        '<div class="sub">Check the Amex Travel listing for current offers, then add them in Data.</div></div>';
+    }
+    body =
+      '<div class="ben"><b>Built-in ' + (h.program === "FHR" ? "FHR" : "Hotel Collection") + ' benefits</b>' + BENEFITS[h.program] + '</div>' +
+      promoHtml;
+  }
+
+  const amexBtns = h.program === "STD" ? "" :
+    '<a target="_blank" rel="noopener" href="' + amexLink(h) + '">Amex Travel ↗</a>' +
+    '<button onclick="copyName(\'' + h.id + '\')">Copy name</button>';
+  const note = h.program === "STD"
+    ? 'Loaded from OpenStreetMap — name and position come from OSM data.'
+    : 'Amex Travel can\u2019t be deep-linked with dates — open it, paste the hotel name, and enter your dates to see the FHR / THC rate.';
+
+  return (
+    '<div class="pp">' +
+      '<h3>' + esc(h.name) + badge + '</h3>' +
+      '<div class="pl">' + (place ? place + ' · ' : '') +
+        fmtNice(state.ci) + ' → ' + fmtNice(state.co) + ' · ' + nightsBetween(state.ci, state.co) + ' nights</div>' +
+      '<div class="brand-line" style="margin:-4px 0 8px">' + brandStr + '</div>' +
+      body +
+      pointsPanelHTML(h) +
+      '<div class="links">' +
+        '<a class="primary" target="_blank" rel="noopener" href="' + googleLink(h) + '">Google prices ↗</a>' +
+        amexBtns +
+      '</div>' +
+      '<div class="note">' + note + '</div>' +
+    '</div>'
+  );
+}
+
+function copyName(id){
+  const h = data.hotels.find(x => x.id === id);
+  if(!h) return;
+  const done = () => toast('Copied “' + h.name + '” — paste it into Amex Travel');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(h.name).then(done, () => fallbackCopy(h.name, done));
+  } else fallbackCopy(h.name, done);
+}
+function fallbackCopy(text, done){
+  const ta = document.createElement("textarea");
+  ta.value = text; document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); done(); }catch(e){}
+  document.body.removeChild(ta);
+}
+
+function rebuildBrandSel(){
+  const sel = document.getElementById("brandSel");
+  const groups = new Set();
+  for(const h of allHotels()) groups.add(brandOf(h).group);
+  if(state.brand) groups.add(state.brand);
+  sel.innerHTML = '<option value="">All brands</option>' +
+    [...groups].sort().map(g =>
+      '<option value="' + esc(g) + '"' + (g === state.brand ? " selected" : "") + '>' + esc(g) + '</option>'
+    ).join("");
+}
+
+const LIST_CAP = 250;
+
+function render(){
+  rebuildBrandSel();
+  const hotels = filteredHotels();
+  // list
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+  const order = {ok:0, near:1, none:2};
+  const sorted = hotels.slice().map(h => ({h, s: h.program === "STD" ? "std" : hotelPromoSummary(h).status}))
+    .sort((a,b) => {
+      const ra = a.s === "std" ? 3 : order[a.s];
+      const rb = b.s === "std" ? 3 : order[b.s];
+      return ra - rb || a.h.name.localeCompare(b.h.name);
+    });
+  if(!sorted.length){
+    list.innerHTML = '<div class="empty">No hotels match. Clear a filter, broaden your search, zoom the map to a city and press “Load hotels in view,” or add properties in Data.</div>';
+  }
+  const shown = sorted.slice(0, LIST_CAP);
+  for(const {h, s} of shown){
+    const br = brandOf(h);
+    const brandStr = br.group === "Independent / Other"
+      ? (br.brand ? esc(br.brand) : "Independent")
+      : esc(br.group) + (br.brand && br.brand !== br.group ? " · " + esc(br.brand) : "");
+    const statusChip = h.program === "STD"
+      ? '<span class="status brand">' + esc(brandShort(br.group)) + '</span>'
+      : '<span class="status ' + s + '">' + statusText(s) + '</span>';
+    const place = [h.city, h.country].filter(Boolean).map(esc).join(", ");
+    const card = document.createElement("div");
+    card.className = "card"; card.tabIndex = 0; card.setAttribute("role","listitem");
+    card.innerHTML =
+      '<div class="row1"><div class="seal ' + h.program + '">' + (h.program === "FHR" ? "F" : h.program === "THC" ? "H" : "·") + '</div>' +
+      '<div><div class="nm">' + esc(h.name) + '</div>' +
+      '<div class="loc">' + (place || "&nbsp;") + '</div>' +
+      '<div class="brand-line">' + brandStr + '</div></div></div>' +
+      '<div class="leader"><span class="dots"></span>' + statusChip + '</div>';
+    const go = () => {
+      const m = markerById[h.id];
+      if(m){
+        map.flyTo([h.lat, h.lng], Math.max(map.getZoom(), 12), {duration:.8});
+        cluster.zoomToShowLayer(m, () => m.openPopup());
+      }
+    };
+    card.addEventListener("click", go);
+    card.addEventListener("keydown", e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } });
+    list.appendChild(card);
+  }
+  if(sorted.length > LIST_CAP){
+    const more = document.createElement("div");
+    more.className = "empty";
+    more.textContent = "+" + (sorted.length - LIST_CAP) + " more on the map — refine the search or filters to list them.";
+    list.appendChild(more);
+  }
+  const amexCount = hotels.filter(h => h.program !== "STD").length;
+  document.getElementById("count").textContent =
+    amexCount + " Amex · " + (hotels.length - amexCount) + " other";
+
+  // markers
+  cluster.clearLayers(); markerById = {};
+  for(const h of hotels){
+    const s = h.program === "STD" ? "none" : hotelPromoSummary(h).status;
+    const m = L.marker([h.lat, h.lng], {icon: makeIcon(h, s), title: h.name});
+    m.bindPopup(() => popupHTML(h), {maxWidth: 330});
+    markerById[h.id] = m;
+    cluster.addLayer(m);
+  }
+}
+
+/* ---------- toast ---------- */
+let toastT;
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+/* ---------- init ---------- */
+function init(){
+  // default dates: 30 days out, 4 nights (long enough to light up nth-night offers)
+  const t = new Date();
+  const ci = new Date(t); ci.setDate(ci.getDate() + 30);
+  const co = new Date(ci); co.setDate(co.getDate() + 4);
+  state.ci = fmtISO(ci); state.co = fmtISO(co);
+  const ciEl = document.getElementById("ci"), coEl = document.getElementById("co");
+  ciEl.value = state.ci; coEl.value = state.co;
+
+  function onDates(){
+    let a = ciEl.value, b = coEl.value;
+    if(!a || !b) return;
+    if(b <= a){ // keep checkout after checkin
+      const d = parseISO(a); d.setUTCDate(d.getUTCDate() + 1);
+      b = fmtISO(d); coEl.value = b;
+    }
+    state.ci = a; state.co = b;
+    updateNights(); render();
+  }
+  ciEl.addEventListener("change", onDates);
+  coEl.addEventListener("change", onDates);
+  updateNights();
+
+  document.getElementById("q").addEventListener("input", e => { state.q = e.target.value; render(); });
+
+  document.querySelectorAll(".chip").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const k = btn.dataset.k;
+      const on = btn.getAttribute("aria-pressed") !== "true";
+      btn.setAttribute("aria-pressed", String(on));
+      if(k === "promo") state.promoOnly = on; else state.programs[k] = on;
+      render();
+    });
+  });
+
+  // map
+  map = L.map("map", {worldCopyJump:true}).setView([25, 10], 2);
+  const tiles = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: "abcd", maxZoom: 19
+  }).addTo(map);
+  // fallback to standard OSM tiles if the CARTO basemap can't load
+  let tileFallbackDone = false;
+  tiles.on("tileerror", () => {
+    if(tileFallbackDone) return;
+    tileFallbackDone = true;
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom: 19
+    }).addTo(map);
+  });
+  // guard against the container sizing late (gray/partial map)
+  setTimeout(() => map.invalidateSize(), 200);
+  window.addEventListener("resize", () => map.invalidateSize());
+  window.addEventListener("load", () => map.invalidateSize());
+  cluster = L.markerClusterGroup({showCoverageOnHover:false, maxClusterRadius:42});
+  map.addLayer(cluster);
+
+  // "Load hotels in view" control (Overpass / OpenStreetMap)
+  const osmCtl = L.control({position:"topright"});
+  osmCtl.onAdd = function(){
+    const btn = L.DomUtil.create("button", "osm-ctl");
+    btn.type = "button";
+    btn.textContent = "Load hotels in view";
+    btn.title = "Fetch all hotels in the current map view from OpenStreetMap";
+    L.DomEvent.disableClickPropagation(btn);
+    btn.addEventListener("click", () => loadOsmHotels(btn));
+    return btn;
+  };
+  osmCtl.addTo(map);
+
+  // when a popup opens with saved award entries, show the verdict immediately
+  map.on("popupopen", ev => {
+    const el = ev.popup.getElement();
+    const inp = el && el.querySelector("input[id^='pc_cash_']");
+    if(inp && inp.value) calcPoints(inp.id.slice("pc_cash_".length));
+  });
+
+  document.getElementById("brandSel").addEventListener("change", e => {
+    state.brand = e.target.value; render();
+  });
+
+  // banner
+  document.getElementById("bannerX").addEventListener("click", () => {
+    document.getElementById("banner").style.display = "none";
+    setTimeout(() => map.invalidateSize(), 50);
+  });
+
+  // data dialog
+  const dlg = document.getElementById("dataDlg");
+  const ta = document.getElementById("dataTa");
+  const msg = document.getElementById("dataMsg");
+  document.getElementById("dataBtn").addEventListener("click", () => {
+    ta.value = JSON.stringify(data, null, 2);
+    msg.textContent = "";
+    dlg.showModal();
+  });
+  dlg.querySelector("[data-close]").addEventListener("click", () => dlg.close());
+  document.getElementById("saveData").addEventListener("click", () => {
+    try{
+      const d = JSON.parse(ta.value);
+      if(!Array.isArray(d.hotels) || !Array.isArray(d.promos)) throw new Error("Needs hotels[] and promos[]");
+      if(!d.pointValues) d.pointValues = JSON.parse(JSON.stringify(DEFAULT_POINT_VALUES));
+      brandCache.clear();
+      data = d;
+      const persisted = saveData(d);
+      msg.textContent = persisted ? "Saved to this browser." : "Saved for this session (browser storage unavailable).";
+      render();
+    }catch(e){ msg.textContent = "JSON error: " + e.message; }
+  });
+  document.getElementById("exportData").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "stay-ledger-data.json";
+    a.click(); URL.revokeObjectURL(a.href);
+  });
+  document.getElementById("resetData").addEventListener("click", () => {
+    if(!confirm("Replace your edits with the original seed data?")) return;
+    data = JSON.parse(JSON.stringify(SEED));
+    data.pointValues = JSON.parse(JSON.stringify(DEFAULT_POINT_VALUES));
+    brandCache.clear();
+    saveData(data);
+    ta.value = JSON.stringify(data, null, 2);
+    msg.textContent = "Reset to seed.";
+    render();
+  });
+
+  document.getElementById("qaGo").addEventListener("click", quickAddHotels);
+
+  render();
+  setTimeout(() => toast("Tip: zoom to a city, then press “Load hotels in view” (top-right of the map) to add every regular hotel there."), 1200);
+}
+function updateNights(){
+  const n = nightsBetween(state.ci, state.co);
+  document.getElementById("nights").textContent = n + " night" + (n === 1 ? "" : "s");
+}
+window.copyName = copyName;
+window.calcPoints = calcPoints;
+init();
+</script>
+</body>
+</html>
