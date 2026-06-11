@@ -609,7 +609,7 @@ const BENEFITS = {
 };
 const AMEX_URL = {
   FHR: "https://www.americanexpress.com/en-us/travel/fine-hotels-and-resorts",
-  THC: "https://www.americanexpress.com/en-us/travel/the-hotel-collection/book/"
+  THC: "https://hotel-booking.americanexpress.com/en-us/thc/welcome"
 };
 const AMEX_OFFERS_URL = "https://www.amextravel.com/featured-hotel-searches";
 const LS_KEY = "stayLedgerData_v1";
@@ -1199,11 +1199,10 @@ function hotelPromoSummary(h){
 
 /* ---------- deep links ---------- */
 function googleLink(h){
-  // google.com/travel date parameters aren't publicly supported and break on
-  // some devices, so use a plain search — the hotel price panel loads reliably
-  // and you pick the dates there (shown in this popup for reference).
-  return "https://www.google.com/search?q=" +
-    encodeURIComponent(h.name + (h.city ? " " + h.city : "") + " hotel prices");
+  // Official, documented Google Maps URL API — never breaks, and on phones it
+  // opens the Maps app directly at this hotel with the price/booking module.
+  return "https://www.google.com/maps/search/?api=1&query=" +
+    encodeURIComponent(h.name + (h.city ? " " + h.city : ""));
 }
 function amexLink(h){ return AMEX_URL[h.program] || AMEX_URL.FHR; }
 
@@ -1277,11 +1276,11 @@ function popupHTML(h){
   }
 
   const amexBtns = h.program === "STD" ? "" :
-    '<a target="_blank" rel="noopener" href="' + amexLink(h) + '">Amex Travel ↗</a>' +
+    '<a target="_blank" rel="noopener" href="' + amexLink(h) + '" onclick="copyName(\'' + h.id + '\')">Amex Travel ↗</a>' +
     '<button onclick="copyName(\'' + h.id + '\')">Copy name</button>';
   const note = h.program === "STD"
     ? 'Loaded from OpenStreetMap — name and position come from OSM data.'
-    : 'Amex pages can\u2019t carry your dates in the link — open the program page, then search this hotel (use Copy name) with your dates for the FHR / THC rate. Promos live on the <a target="_blank" rel="noopener" href="' + AMEX_OFFERS_URL + '">featured offers page ↗</a>.';
+    : 'The Amex button auto-copies this hotel\u2019s name — when the page opens, paste it into the search box and enter your dates (' + fmtNice(state.ci) + ' → ' + fmtNice(state.co) + ') for the live rate. Promos: <a target="_blank" rel="noopener" href="' + AMEX_OFFERS_URL + '">featured offers ↗</a>.';
 
   // recorded real prices for these exact dates — shown first
   const saved = (data.awardLog || {})[awardKey(h.id)];
