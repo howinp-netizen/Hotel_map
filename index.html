@@ -279,7 +279,7 @@ dialog::backdrop{background:rgba(18,28,46,.55)}
     <span id="nights"></span>
   </div>
   <div class="hd-group hd-search">
-    <input type="search" id="q" placeholder="Search hotel, city, country…" aria-label="Search hotels">
+    <input type="search" id="q" placeholder="Filter hotels — or type a city + Enter" aria-label="Search hotels or go to a city">
   </div>
   <div class="hd-group">
     <button class="chip" data-k="FHR" aria-pressed="true">FHR</button>
@@ -1280,18 +1280,30 @@ function popupHTML(h){
     ? 'Loaded from OpenStreetMap — name and position come from OSM data.'
     : 'Amex Travel can\u2019t be deep-linked with dates — open it, paste the hotel name, and enter your dates to see the FHR / THC rate.';
 
+  // recorded real prices for these exact dates — shown first
+  const saved = (data.awardLog || {})[awardKey(h.id)];
+  const recorded = saved && (saved.cash || saved.pts)
+    ? '<div class="promo ok"><div class="pt">Your recorded price — these dates</div><div class="sub">' +
+        (saved.cash ? "$" + Number(saved.cash).toLocaleString() + " cash" : "") +
+        (saved.cash && saved.pts ? " · " : "") +
+        (saved.pts ? Number(saved.pts).toLocaleString() + " pts" : "") +
+        (saved.savedAt ? " · entered " + fmtNice(saved.savedAt) : "") +
+      '</div></div>'
+    : '';
+
   return (
     '<div class="pp">' +
       '<h3>' + esc(h.name) + badge + '</h3>' +
       '<div class="pl">' + (place ? place + ' · ' : '') +
         fmtNice(state.ci) + ' → ' + fmtNice(state.co) + ' · ' + nightsBetween(state.ci, state.co) + ' nights</div>' +
       '<div class="brand-line" style="margin:-4px 0 8px">' + brandStr + '</div>' +
-      body +
-      pointsPanelHTML(h) +
-      '<div class="links">' +
+      '<div class="links" style="margin:0 0 8px">' +
         '<a class="primary" target="_blank" rel="noopener" href="' + googleLink(h) + '">Google prices ↗</a>' +
         amexBtns +
       '</div>' +
+      recorded +
+      body +
+      pointsPanelHTML(h) +
       '<div class="note">' + note + '</div>' +
     '</div>'
   );
@@ -1328,9 +1340,31 @@ const LIST_CAP = 250;
 function render(){
   rebuildBrandSel();
   const hotels = filteredHotels();
-  // list
+  // markers — always global so clusters show everywhere
+  cluster.clearLayers(); markerById = {};
+  for(const h of hotels){
+    const s = h.program === "STD" ? "none" : hotelPromoSummary(h).status;
+    const m = L.marker([h.lat, h.lng], {icon: makeIcon(h, s), title: h.name});
+    m.bindPopup(() => popupHTML(h), {maxWidth: 330});
+    markerById[h.id] = m;
+    cluster.addLayer(m);
+  }
+  renderList();
+}
+
+/* The sidebar follows the map: it lists only hotels inside the current
+   view, so clicking a card never teleports you to another city.
+   Typing in the search box switches to a global name search instead. */
+function renderList(){
+  if(!map) return;
   const list = document.getElementById("list");
   list.innerHTML = "";
+  const searching = !!state.q.trim();
+  let hotels = filteredHotels();
+  if(!searching){
+    const b = map.getBounds().pad(0.05);
+    hotels = hotels.filter(h => b.contains([h.lat, h.lng]));
+  }
   const order = {ok:0, near:1, none:2};
   const sorted = hotels.slice().map(h => ({h, s: h.program === "STD" ? "std" : hotelPromoSummary(h).status}))
     .sort((a,b) => {
@@ -1339,7 +1373,9 @@ function render(){
       return ra - rb || a.h.name.localeCompare(b.h.name);
     });
   if(!sorted.length){
-    list.innerHTML = '<div class="empty">No hotels match. Clear a filter, broaden your search, zoom the map to a city and press “Load hotels in view,” or add properties in Data.</div>';
+    list.innerHTML = searching
+      ? '<div class="empty">No hotels match that search. Try fewer words — or press Enter to fly the map to that place.</div>'
+      : '<div class="empty">No hotels in this map view. Pan or zoom the map, type a city + Enter, or press “Load hotels in view” for regular hotels here.</div>';
   }
   const shown = sorted.slice(0, LIST_CAP);
   for(const {h, s} of shown){
@@ -1378,17 +1414,7 @@ function render(){
   }
   const amexCount = hotels.filter(h => h.program !== "STD").length;
   document.getElementById("count").textContent =
-    amexCount + " Amex · " + (hotels.length - amexCount) + " other";
-
-  // markers
-  cluster.clearLayers(); markerById = {};
-  for(const h of hotels){
-    const s = h.program === "STD" ? "none" : hotelPromoSummary(h).status;
-    const m = L.marker([h.lat, h.lng], {icon: makeIcon(h, s), title: h.name});
-    m.bindPopup(() => popupHTML(h), {maxWidth: 330});
-    markerById[h.id] = m;
-    cluster.addLayer(m);
-  }
+    amexCount + " Amex · " + (hotels.length - amexCount) + " other " + (searching ? "matching" : "in view");
 }
 
 /* ---------- toast ---------- */
@@ -1425,6 +1451,36 @@ function init(){
   updateNights();
 
   document.getElementById("q").addEventListener("input", e => { state.q = e.target.value; render(); });
+
+  // Enter in the search box = fly the map to that city/region (Nominatim)
+  document.getElementById("q").addEventListener("keydown", async e => {
+    if(e.key !== "Enter") return;
+    const qv = e.target.value.trim();
+    if(!qv) return;
+    e.preventDefault();
+    toast("Looking up \u201C" + qv + "\u201D\u2026");
+    try{
+      const res = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(qv));
+      const js = await res.json();
+      if(js && js[0]){
+        const r = js[0];
+        if(r.boundingbox && r.boundingbox.length === 4){
+          const bb = r.boundingbox.map(Number); // [south, north, west, east]
+          map.flyToBounds([[bb[0], bb[2]], [bb[1], bb[3]]], {duration:.9, maxZoom:13});
+        } else {
+          map.flyTo([parseFloat(r.lat), parseFloat(r.lon)], 12, {duration:.9});
+        }
+        e.target.value = ""; state.q = "";
+        render();
+        toast("Moved to " + esc((r.display_name || qv).split(",")[0]) +
+          " \u2014 press \u201CLoad hotels in view\u201D to pull in every hotel here.");
+      } else {
+        toast("Couldn\u2019t find \u201C" + qv + "\u201D \u2014 try adding a state or country.");
+      }
+    }catch(err){
+      toast("Location search failed: " + err.message);
+    }
+  });
 
   document.querySelectorAll(".chip").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -1470,6 +1526,9 @@ function init(){
     return btn;
   };
   osmCtl.addTo(map);
+
+  // sidebar list follows the map view
+  map.on("moveend zoomend", renderList);
 
   // when a popup opens with saved award entries, show the verdict immediately
   map.on("popupopen", ev => {
